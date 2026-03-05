@@ -50,7 +50,7 @@ smoke: ## Run end-to-end smoke test
 
 # --- Infra Bring-up ---
 .PHONY: up
-up: ## Start local infra stack (Langfuse + LiteLLM)
+up: ## Start local infra stack (Langfuse + LiteLLM + Ollama + Kestra)
 	@echo "=== Starting infra stack via $(COMPOSE_FILE) ==="
 	@$(COMPOSE) up -d --remove-orphans
 	@echo "=== Infra stack is up ==="
@@ -116,11 +116,15 @@ kestra-run: ## Trigger Kestra research session flow using QUERY/SEEDS vars
 kestra-logs: ## Tail Kestra container logs
 	@$(COMPOSE) logs -f --tail=200 kestra
 
+.PHONY: kestra-build
+kestra-build: ## Build custom Kestra image with Python deps baked in
+	@echo "=== Building custom Kestra image ==="
+	@$(COMPOSE) build kestra
+	@echo "  ✓ Kestra image built with requirements.lock"
+
 .PHONY: kestra-install-deps
-kestra-install-deps: ## Install Python deps inside Kestra container for flow scripts
-	@echo "=== Installing Python dependencies inside Kestra container ==="
-	@$(COMPOSE) exec -T kestra sh -lc "pip3 install -r /home/joel/work/sociology-agentic-stack/requirements.lock"
-	@echo "  ✓ Kestra Python dependencies installed"
+kestra-install-deps: kestra-build ## Compatibility alias: deps are baked into the Kestra image
+	@echo "  ✓ Dependencies are baked into the custom Kestra image"
 
 # --- Research Session ---
 QUERY ?= Sociological drivers of civic disengagement in urban youth

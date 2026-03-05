@@ -28,12 +28,12 @@ model_list:
   # --- Local providers (via Ollama; OpenAI-compatible) ---
   - model_name: "local_qwen"
     litellm_params:
-      model: "ollama/qwen2.5:7b"
+      model: "ollama/llama3.2:latest"
       api_base: "os.environ/OLLAMA_BASE_URL"
 
   - model_name: "local_mistral"
     litellm_params:
-      model: "ollama/mistral:7b"
+      model: "ollama/llama3.2:latest"
       api_base: "os.environ/OLLAMA_BASE_URL"
 
 # Router behavior for LiteLLM.
@@ -42,7 +42,8 @@ router_settings:
   routing_strategy: "simple-shuffle"
   # Aliases let clients request a logical name (e.g., "synthesis") while routing to real models.
   model_group_alias:
-    synthesis: "analysis"
+    synthesis: "local_qwen"
+    analysis: "local_qwen"
 
 # LiteLLM module settings.
 litellm_settings:
