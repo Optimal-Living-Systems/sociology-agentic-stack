@@ -17,12 +17,12 @@ model_list:
 
   - model_name: "claude_synthesis"
     litellm_params:
-      model: "anthropic/claude-3-7-sonnet"
+      model: "anthropic/claude-sonnet-4-6"
       api_key: "os.environ/ANTHROPIC_API_KEY"
 
   - model_name: "mistral_synthesis"
     litellm_params:
-      model: "mistral/mistral-large"
+      model: "mistral/mistral-large-latest"
       api_key: "os.environ/MISTRAL_API_KEY"
 
   # --- Local providers (via Ollama; OpenAI-compatible) ---
