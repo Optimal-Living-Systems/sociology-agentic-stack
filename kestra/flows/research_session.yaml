@@ -1,0 +1,69 @@
+# Kestra flow for full research session orchestration.
+id: sociology-research-session
+namespace: ols.research
+description: "Run a sociology research session, review outputs, and archive artifacts."
+
+inputs:
+  - id: query
+    type: STRING
+    required: true
+    description: "Primary research question to answer."
+  - id: taxonomy_seeds
+    type: STRING
+    required: true
+    description: "Comma-separated ontology seed IDs."
+  - id: model_config
+    type: STRING
+    defaults: default
+    description: "Model routing profile alias."
+  - id: corpus_id
+    type: STRING
+    defaults: sociology
+    description: "Corpus identifier used by retrieval."
+  - id: schema_pack_version
+    type: STRING
+    defaults: "1.0.0"
+    description: "Schema pack version expected by the session runtime."
+
+tasks:
+  - id: run_session
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "Execute the main research session script with runtime inputs."
+    warningOnStdErr: false
+    commands:
+      - |
+        set -e
+        cd /home/joel/work/sociology-agentic-stack
+        source .venv/bin/activate
+        python scripts/run_session.py \
+          --query "{{ inputs.query }}" \
+          --taxonomy-seeds "{{ inputs.taxonomy_seeds }}" \
+          --model-config "{{ inputs.model_config }}" \
+          --corpus-id "{{ inputs.corpus_id }}" \
+          --schema-pack-version "{{ inputs.schema_pack_version }}"
+
+  - id: run_review
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "Run review-only artifact audits after synthesis."
+    warningOnStdErr: false
+    commands:
+      - |
+        set -e
+        cd /home/joel/work/sociology-agentic-stack
+        source .venv/bin/activate
+        python scripts/run_review.py \
+          --artifacts-dir artifacts \
+          --report-dir docs/review_reports
+
+  - id: archive_session
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "Archive session artifacts and metadata for reproducibility."
+    warningOnStdErr: false
+    commands:
+      - |
+        set -e
+        cd /home/joel/work/sociology-agentic-stack
+        source .venv/bin/activate
+        python scripts/archive_session.py \
+          --artifacts-dir artifacts \
+          --archive-dir data/archives

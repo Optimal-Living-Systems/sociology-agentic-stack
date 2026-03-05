@@ -1,0 +1,21 @@
+# Schema pack manifest used by runtime loaders to discover every schema/template file.
+schema_pack:
+  name: "sociology-research-v1"
+  version: "1.0.0"
+  domain: "sociology"
+  description: "Sociology research schema pack for the OLS Open Science Research Lab"
+  compatible_workflow: "sociology_session"
+  created: "2026-03-04"
+
+  ontology_file: "ontology.yaml"
+  artifact_schemas:
+    - "artifact_schemas/claim.jsonschema"
+    - "artifact_schemas/glossary_entry.jsonschema"
+    - "artifact_schemas/summary_metadata.jsonschema"
+    - "artifact_schemas/critique_finding.jsonschema"
+  templates:
+    - "templates/synthesize_summary.yaml"
+    - "templates/synthesize_claims.yaml"
+    - "templates/synthesize_glossary.yaml"
+    - "templates/critique_citation.yaml"
+    - "templates/critique_schema.yaml"

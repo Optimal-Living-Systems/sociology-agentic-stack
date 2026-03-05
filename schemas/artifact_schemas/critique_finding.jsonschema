@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://optimallivingsystems.org/schemas/critique_finding.jsonschema",
+  "title": "Critique Finding",
+  "description": "Quality/review finding produced by citation or schema audits.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "finding_type",
+    "severity",
+    "description",
+    "affected_artifact"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for this finding."
+    },
+    "finding_type": {
+      "type": "string",
+      "enum": [
+        "unsupported_claim",
+        "missing_citation",
+        "schema_violation",
+        "duplicate_entry",
+        "inconsistent_definition"
+      ],
+      "description": "Normalized category used by review dashboards and remediation workflows."
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "description": "Impact level for prioritizing fixes."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable description of the issue."
+    },
+    "affected_artifact": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Artifact path or identifier affected by this finding."
+    },
+    "affected_record_id": {
+      "type": "string",
+      "description": "Optional record-level identifier for pinpoint remediation."
+    }
+  }
+}

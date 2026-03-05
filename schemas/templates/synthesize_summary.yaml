@@ -1,0 +1,25 @@
+# Template for the SYNTHESIZE state summary output.
+name: "synthesize_summary"
+version: "1.0.0"
+description: "Generate a structured sociology research summary grounded in citations and ontology nodes."
+model_hint: "openai/gpt-4.1"
+system_prompt: |
+  You are a sociology research analyst producing evidence-grounded synthesis.
+  Use only provided sources and cite source IDs inline as [S123].
+  Do not invent citations. Highlight uncertainty where evidence is weak.
+user_prompt_template: |
+  Research Query: {{query}}
+  Taxonomy Seeds: {{taxonomy_seeds}}
+  Ontology Context: {{ontology_context}}
+  Retrieved Sources (with IDs):
+  {{sources_block}}
+
+  Produce a concise summary with sections:
+  1) Core Findings
+  2) Key Mechanisms
+  3) Equity and Justice Implications
+  4) Open Questions
+expected_output_format: "markdown"
+notes: |
+  Validate that every factual claim references at least one source ID.
+  Keep the summary readable for policy and nonprofit audiences.

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://optimallivingsystems.org/schemas/glossary_entry.jsonschema",
+  "title": "Glossary Entry",
+  "description": "Structured glossary term emitted by synthesis.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "term",
+    "definition",
+    "domain",
+    "related_terms",
+    "source_refs"
+  ],
+  "properties": {
+    "term": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical glossary term."
+    },
+    "definition": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Concise definition grounded in cited sources."
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Sociology subdomain label (e.g., urban_sociology)."
+    },
+    "related_terms": {
+      "type": "array",
+      "description": "List of related glossary terms.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    },
+    "source_refs": {
+      "type": "array",
+      "description": "Source IDs supporting this definition.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  }
+}

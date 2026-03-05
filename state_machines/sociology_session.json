@@ -1,0 +1,77 @@
+{
+  "_note": "Format based on SHERPA MODELS 2025 paper. May need adjustment after course.",
+  "name": "sociology_research_session",
+  "description": "Taxonomy/ontology-first sociology workflow from intake to finalized artifacts.",
+  "states": [
+    {
+      "id": "INTAKE",
+      "description": "Accept query and optional taxonomy seeds, validate required inputs.",
+      "type": "task"
+    },
+    {
+      "id": "RETRIEVE_LOCAL",
+      "description": "Retrieve topK local sources from vector store and attach source IDs.",
+      "type": "task"
+    },
+    {
+      "id": "RETRIEVE_WEB",
+      "description": "Run web retrieval, store URL/citation records, and normalize source metadata.",
+      "type": "task"
+    },
+    {
+      "id": "SYNTHESIZE",
+      "description": "Generate summary/claims/glossary using schema-pack templates.",
+      "type": "task"
+    },
+    {
+      "id": "CRITIQUE",
+      "description": "Run citation integrity and schema validation checks with retry gate.",
+      "type": "decision"
+    },
+    {
+      "id": "FINALIZE",
+      "description": "Persist artifacts and optional git checkpoint.",
+      "type": "task"
+    }
+  ],
+  "transitions": [
+    {
+      "from": "INTAKE",
+      "to": "RETRIEVE_LOCAL",
+      "condition": "inputs_valid"
+    },
+    {
+      "from": "RETRIEVE_LOCAL",
+      "to": "RETRIEVE_WEB",
+      "condition": "local_retrieval_complete"
+    },
+    {
+      "from": "RETRIEVE_WEB",
+      "to": "SYNTHESIZE",
+      "condition": "web_retrieval_complete"
+    },
+    {
+      "from": "SYNTHESIZE",
+      "to": "CRITIQUE",
+      "condition": "artifacts_generated"
+    },
+    {
+      "from": "CRITIQUE",
+      "to": "SYNTHESIZE",
+      "condition": "needs_retry && retry_count < 2"
+    },
+    {
+      "from": "CRITIQUE",
+      "to": "FINALIZE",
+      "condition": "critique_passed || retry_count >= 2"
+    }
+  ],
+  "initial_state": "INTAKE",
+  "end_states": [
+    "FINALIZE"
+  ],
+  "runtime": {
+    "max_retries": 2,
+    "retry_state": "SYNTHESIZE"
+  }
+}

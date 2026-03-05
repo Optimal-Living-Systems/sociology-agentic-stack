@@ -1,0 +1,45 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Runtime outputs (DVC tracked)
+artifacts/*
+!artifacts/.gitkeep
+data/*
+!data/.gitkeep
+corpus/*
+!corpus/.gitkeep
+
+# DVC
+*.dvc
+/dvc.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Langfuse/LiteLLM Docker volumes
+integrations/langfuse/postgres_data/
+integrations/langfuse/clickhouse_data/
+integrations/langfuse/redis_data/
+integrations/litellm/data/
+!integrations/langfuse/postgres_data/.gitkeep
+!integrations/langfuse/clickhouse_data/.gitkeep
+!integrations/langfuse/redis_data/.gitkeep
+!integrations/litellm/data/.gitkeep

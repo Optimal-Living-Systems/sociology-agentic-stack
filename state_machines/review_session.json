@@ -1,0 +1,58 @@
+{
+  "_note": "Format based on SHERPA MODELS 2025 paper. May need adjustment after course.",
+  "name": "sociology_review_session",
+  "description": "Review-only workflow for citation integrity and schema consistency audits.",
+  "states": [
+    {
+      "id": "LOAD_ARTIFACTS",
+      "description": "Load generated artifacts and prepare normalized in-memory structures.",
+      "type": "task"
+    },
+    {
+      "id": "CITATION_AUDIT",
+      "description": "Check summary and claims for missing or weak evidence references.",
+      "type": "task"
+    },
+    {
+      "id": "SCHEMA_AUDIT",
+      "description": "Validate artifact records against JSONSchema definitions.",
+      "type": "task"
+    },
+    {
+      "id": "DUPLICATION_AUDIT",
+      "description": "Detect duplicate claims and inconsistent glossary definitions.",
+      "type": "task"
+    },
+    {
+      "id": "WRITE_REPORT",
+      "description": "Write markdown and JSON findings into docs/review_reports.",
+      "type": "task"
+    }
+  ],
+  "transitions": [
+    {
+      "from": "LOAD_ARTIFACTS",
+      "to": "CITATION_AUDIT",
+      "condition": "artifacts_loaded"
+    },
+    {
+      "from": "CITATION_AUDIT",
+      "to": "SCHEMA_AUDIT",
+      "condition": "citation_checks_complete"
+    },
+    {
+      "from": "SCHEMA_AUDIT",
+      "to": "DUPLICATION_AUDIT",
+      "condition": "schema_checks_complete"
+    },
+    {
+      "from": "DUPLICATION_AUDIT",
+      "to": "WRITE_REPORT",
+      "condition": "duplication_checks_complete"
+    }
+  ],
+  "initial_state": "LOAD_ARTIFACTS",
+  "end_states": [
+    "WRITE_REPORT"
+  ]
+}

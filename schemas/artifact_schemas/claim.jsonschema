@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://optimallivingsystems.org/schemas/claim.jsonschema",
+  "title": "Claim Record",
+  "description": "Structured claim emitted by the synthesis stage.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "claim_text",
+    "confidence",
+    "evidence_refs",
+    "taxonomy_nodes"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Stable unique claim identifier for cross-artifact linking."
+    },
+    "claim_text": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable claim sentence."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Model confidence score normalized to 0-1."
+    },
+    "evidence_refs": {
+      "type": "array",
+      "description": "Source IDs that support this claim.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "taxonomy_nodes": {
+      "type": "array",
+      "description": "Ontology node IDs associated with the claim.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "counterarguments": {
+      "type": "array",
+      "description": "Optional counterarguments to support critical analysis.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    }
+  }
+}

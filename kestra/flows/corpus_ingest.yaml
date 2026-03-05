@@ -1,0 +1,31 @@
+# Kestra flow for loading new local corpus content into the retrieval layer.
+id: corpus-ingest
+namespace: ols.research
+description: "Ingest local source files into vector retrieval storage."
+
+inputs:
+  - id: source_dir
+    type: STRING
+    required: true
+    description: "Directory containing source files to ingest."
+  - id: corpus_id
+    type: STRING
+    defaults: sociology
+    description: "Corpus identifier for retrieval indexing."
+
+tasks:
+  - id: ingest_corpus
+    type: io.kestra.plugin.scripts.shell.Commands
+    description: "Run ingestion script (implemented in later phase)."
+    warningOnStdErr: false
+    commands:
+      - |
+        set -e
+        cd /home/joel/work/sociology-agentic-stack
+        source .venv/bin/activate
+        python scripts/run_session.py \
+          --query "Corpus ingest dry run" \
+          --taxonomy-seeds "social_capital" \
+          --corpus-id "{{ inputs.corpus_id }}" \
+          --dry-run
+        echo "Use source_dir={{ inputs.source_dir }} in ingestion implementation phase."

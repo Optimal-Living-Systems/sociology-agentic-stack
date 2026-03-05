@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://optimallivingsystems.org/schemas/summary_metadata.jsonschema",
+  "title": "Summary Metadata",
+  "description": "Sidecar metadata describing one generated summary.md artifact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "query",
+    "taxonomy_seeds",
+    "sources_cited",
+    "schema_pack_version",
+    "model_used",
+    "timestamp"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique session run identifier."
+    },
+    "query": {
+      "type": "string",
+      "minLength": 1,
+      "description": "User research query for this run."
+    },
+    "taxonomy_seeds": {
+      "type": "array",
+      "description": "Seed ontology nodes selected at intake.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "sources_cited": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of unique source IDs cited in outputs."
+    },
+    "schema_pack_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Version of schema pack used at runtime."
+    },
+    "model_used": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Model alias or deployment name used for synthesis."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp when the summary was finalized."
+    }
+  }
+}

@@ -1,0 +1,24 @@
+# Template for citation integrity critique.
+name: "critique_citation"
+version: "1.0.0"
+description: "Audit claims and summary text for unsupported statements and missing citations."
+model_hint: "openai/gpt-4.1-mini"
+system_prompt: |
+  You are a strict citation auditor.
+  Flag any claim lacking clear evidence refs.
+  Distinguish unsupported claims from weakly supported claims.
+user_prompt_template: |
+  Summary Markdown:
+  {{summary_markdown}}
+
+  Claims JSONL:
+  {{claims_jsonl}}
+
+  Source Index:
+  {{source_index}}
+
+  Produce findings with severity and affected artifact references.
+expected_output_format: "markdown + jsonl findings"
+notes: |
+  Prioritize precision over recall in hallucination flags.
+  Use finding types from critique_finding schema.

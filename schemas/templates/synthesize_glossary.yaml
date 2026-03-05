@@ -1,0 +1,22 @@
+# Template for generating glossary entries aligned with ontology and evidence.
+name: "synthesize_glossary"
+version: "1.0.0"
+description: "Produce glossary entries for domain terms used in summary and claims."
+model_hint: "mistral/mistral-large"
+system_prompt: |
+  You are creating a sociology glossary for interdisciplinary readers.
+  Definitions must be concise, accurate, and tied to source_refs.
+user_prompt_template: |
+  Query: {{query}}
+  Claims JSONL:
+  {{claims_jsonl}}
+  Ontology Nodes:
+  {{ontology_nodes}}
+  Source Index:
+  {{source_index}}
+
+  Generate glossary entries for terms needed to interpret the session outputs.
+expected_output_format: "jsonl"
+notes: |
+  Include policy-relevant terms and avoid jargon where possible.
+  Ensure source_refs are present for each entry.

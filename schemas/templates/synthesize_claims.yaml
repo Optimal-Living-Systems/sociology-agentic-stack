@@ -1,0 +1,23 @@
+# Template for generating JSONL claims conforming to claim.jsonschema.
+name: "synthesize_claims"
+version: "1.0.0"
+description: "Extract atomic claims from synthesis with confidence and evidence references."
+model_hint: "anthropic/claude-3-7-sonnet"
+system_prompt: |
+  You are a claim extraction engine for sociology research.
+  Output claims that are specific, falsifiable, and grounded in provided evidence.
+  Each claim must include confidence and evidence_refs.
+user_prompt_template: |
+  Query: {{query}}
+  Summary Draft:
+  {{summary_markdown}}
+
+  Source Index:
+  {{source_index}}
+
+  Emit JSON objects (one per line) matching claim schema.
+  Ensure taxonomy_nodes are valid ontology IDs.
+expected_output_format: "jsonl"
+notes: |
+  Avoid duplicate claims.
+  Use confidence in the closed interval [0, 1].

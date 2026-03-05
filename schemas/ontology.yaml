@@ -1,0 +1,194 @@
+# Ontology-first configuration for sociology research workflows.
+# Nodes are intentionally human-editable so non-coders can evolve the taxonomy over time.
+ontology:
+  name: "OLS Sociology Ontology"
+  version: "1.0.0"
+  description: "Cross-linked sociology taxonomy for civic behavior, inequality, institutions, and culture"
+
+  # Node IDs are stable identifiers used by prompts, retrieval metadata, and artifact tags.
+  nodes:
+    - id: "political_participation"
+      label: "Political Participation"
+      domain: "political_sociology"
+      description: "Individual and collective participation in formal and informal political processes."
+      aliases: ["civic participation", "political engagement"]
+
+    - id: "civic_disengagement"
+      label: "Civic Disengagement"
+      domain: "political_sociology"
+      description: "Declining participation in civic institutions, voting, and local governance."
+      aliases: ["civic withdrawal"]
+
+    - id: "social_capital"
+      label: "Social Capital"
+      domain: "community_sociology"
+      description: "Networks, trust, and norms that enable coordination and cooperation."
+      aliases: ["bonding capital", "bridging capital"]
+
+    - id: "institutional_trust"
+      label: "Institutional Trust"
+      domain: "political_sociology"
+      description: "Perceived legitimacy and trustworthiness of public institutions."
+      aliases: ["trust in institutions"]
+
+    - id: "urban_inequality"
+      label: "Urban Inequality"
+      domain: "urban_sociology"
+      description: "Spatially patterned inequality across neighborhoods and city systems."
+      aliases: ["city inequality", "spatial inequality"]
+
+    - id: "neighborhood_effects"
+      label: "Neighborhood Effects"
+      domain: "urban_sociology"
+      description: "Influence of local context on life outcomes and social behavior."
+      aliases: ["place effects"]
+
+    - id: "housing_precarity"
+      label: "Housing Precarity"
+      domain: "urban_sociology"
+      description: "Instability in housing access, affordability, and tenure security."
+      aliases: ["housing insecurity"]
+
+    - id: "social_stratification"
+      label: "Social Stratification"
+      domain: "stratification"
+      description: "Hierarchical structuring of class, status, and power."
+      aliases: ["class hierarchy"]
+
+    - id: "class_reproduction"
+      label: "Class Reproduction"
+      domain: "stratification"
+      description: "Intergenerational persistence of class position through institutions and resources."
+      aliases: ["status reproduction"]
+
+    - id: "labor_market_segmentation"
+      label: "Labor Market Segmentation"
+      domain: "economic_sociology"
+      description: "Division of labor markets into unequal primary and secondary sectors."
+      aliases: ["dual labor market"]
+
+    - id: "race_ethnicity"
+      label: "Race and Ethnicity"
+      domain: "race_ethnicity"
+      description: "Social construction and institutionalization of race/ethnicity and related inequalities."
+      aliases: ["racialization"]
+
+    - id: "structural_racism"
+      label: "Structural Racism"
+      domain: "race_ethnicity"
+      description: "System-level policies and practices producing racialized unequal outcomes."
+      aliases: ["systemic racism"]
+
+    - id: "intersectionality"
+      label: "Intersectionality"
+      domain: "critical_sociology"
+      description: "Co-constituted inequalities across race, class, gender, and other social positions."
+      aliases: ["interlocking oppressions"]
+
+    - id: "social_movements"
+      label: "Social Movements"
+      domain: "collective_action"
+      description: "Organized collective efforts to create or resist social change."
+      aliases: ["collective mobilization"]
+
+    - id: "resource_mobilization"
+      label: "Resource Mobilization"
+      domain: "collective_action"
+      description: "Movement capacity shaped by access to money, networks, and organizational resources."
+      aliases: ["mobilization resources"]
+
+    - id: "collective_identity"
+      label: "Collective Identity"
+      domain: "collective_action"
+      description: "Shared sense of belonging that supports collective action and solidarity."
+      aliases: ["movement identity"]
+
+    - id: "self_determination_theory"
+      label: "Self-Determination Theory"
+      domain: "psychology"
+      description: "Motivation framework centered on autonomy, competence, and relatedness."
+      aliases: ["SDT"]
+
+    - id: "intrinsic_motivation"
+      label: "Intrinsic Motivation"
+      domain: "psychology"
+      description: "Action driven by inherent interest and internal value rather than external rewards."
+      aliases: ["intrinsic drive"]
+
+    - id: "environmental_justice"
+      label: "Environmental Justice"
+      domain: "environmental_sociology"
+      description: "Unequal environmental harms/benefits and justice-oriented policy responses."
+      aliases: ["eco-justice"]
+
+    - id: "climate_vulnerability"
+      label: "Climate Vulnerability"
+      domain: "environmental_sociology"
+      description: "Uneven exposure and adaptive capacity to climate risks across populations."
+      aliases: ["climate risk inequality"]
+
+  # Cross-domain links provide the conceptual graph used by retrieval, reasoning, and critique.
+  links:
+    - source: "civic_disengagement"
+      target: "institutional_trust"
+      relation: "associated_with"
+
+    - source: "civic_disengagement"
+      target: "social_capital"
+      relation: "influenced_by"
+
+    - source: "urban_inequality"
+      target: "neighborhood_effects"
+      relation: "produces"
+
+    - source: "urban_inequality"
+      target: "housing_precarity"
+      relation: "amplifies"
+
+    - source: "social_stratification"
+      target: "class_reproduction"
+      relation: "drives"
+
+    - source: "social_stratification"
+      target: "labor_market_segmentation"
+      relation: "interacts_with"
+
+    - source: "race_ethnicity"
+      target: "structural_racism"
+      relation: "contextualized_by"
+
+    - source: "intersectionality"
+      target: "race_ethnicity"
+      relation: "extends"
+
+    - source: "intersectionality"
+      target: "social_stratification"
+      relation: "extends"
+
+    - source: "social_movements"
+      target: "resource_mobilization"
+      relation: "enabled_by"
+
+    - source: "social_movements"
+      target: "collective_identity"
+      relation: "enabled_by"
+
+    - source: "civic_disengagement"
+      target: "self_determination_theory"
+      relation: "interpreted_by"
+
+    - source: "self_determination_theory"
+      target: "intrinsic_motivation"
+      relation: "supports"
+
+    - source: "urban_inequality"
+      target: "environmental_justice"
+      relation: "linked_to"
+
+    - source: "environmental_justice"
+      target: "climate_vulnerability"
+      relation: "constrains"
+
+    - source: "climate_vulnerability"
+      target: "race_ethnicity"
+      relation: "disproportionately_affects"

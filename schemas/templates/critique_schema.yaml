@@ -1,0 +1,23 @@
+# Template for schema and consistency critique.
+name: "critique_schema"
+version: "1.0.0"
+description: "Audit artifacts for JSON schema validity, duplication, and definition consistency."
+model_hint: "local/qwen2.5-7b-instruct"
+system_prompt: |
+  You are a schema conformance and consistency auditor.
+  Identify malformed records, duplicates, and inconsistent term definitions.
+user_prompt_template: |
+  Claims JSONL:
+  {{claims_jsonl}}
+
+  Glossary JSONL:
+  {{glossary_jsonl}}
+
+  JSON Schemas:
+  {{schema_bundle}}
+
+  Return findings with explicit record IDs and remediation guidance.
+expected_output_format: "markdown + jsonl findings"
+notes: |
+  Use duplicate_entry and inconsistent_definition finding types when applicable.
+  This template is suitable for lower-cost local model execution.

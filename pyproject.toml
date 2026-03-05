@@ -1,0 +1,18 @@
+[project]
+name = "sociology-agentic-stack"
+version = "0.1.0"
+description = "OLS Agentic Sociology Research Stack — taxonomy/ontology-first research factory"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Optimal Living Systems", email = "info@optimallivingsystems.org"},
+]
+
+[project.urls]
+Repository = "https://github.com/Optimal-Living-Systems/sociology-agentic-stack"
+Documentation = "https://github.com/Optimal-Living-Systems/sociology-agentic-stack/tree/main/docs"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
