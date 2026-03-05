@@ -18,6 +18,8 @@
 SHELL := /bin/bash
 VENV := .venv/bin/activate
 PYTHON := source $(VENV) && python
+COMPOSE_FILE ?= compose.yaml
+COMPOSE := ./scripts/docker_compose.sh
 
 .DEFAULT_GOAL := help
 
@@ -40,6 +42,24 @@ smoke: ## Run end-to-end smoke test
 	@echo "=== Running smoke test ==="
 	$(PYTHON) scripts/smoke_test.py
 	@echo "=== Smoke test complete ==="
+
+# --- Infra Bring-up ---
+.PHONY: up
+up: ## Start local infra stack (Langfuse + LiteLLM)
+	@echo "=== Starting infra stack via $(COMPOSE_FILE) ==="
+	@$(COMPOSE) up -d --remove-orphans
+	@echo "=== Infra stack is up ==="
+
+.PHONY: down
+down: ## Stop local infra stack
+	@echo "=== Stopping infra stack ==="
+	@$(COMPOSE) down
+	@echo "=== Infra stack is down ==="
+
+SERVICE ?=
+.PHONY: logs
+logs: ## Tail infra logs. Usage: make logs SERVICE=litellm
+	@$(COMPOSE) logs -f --tail=100 $(SERVICE)
 
 # --- Research Session ---
 QUERY ?= Sociological drivers of civic disengagement in urban youth
@@ -127,6 +147,13 @@ clean: ## Remove generated artifacts (keeps reports)
 	@echo "=== Cleaning artifacts ==="
 	rm -f artifacts/*.md artifacts/*.jsonl
 	@echo "=== Clean complete ==="
+
+# --- Tests ---
+.PHONY: test
+test: ## Run Python test suite
+	@echo "=== Running tests ==="
+	@source $(VENV) && pytest -q
+	@echo "=== Tests complete ==="
 
 # --- Help ---
 .PHONY: help
