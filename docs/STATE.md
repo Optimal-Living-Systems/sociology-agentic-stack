@@ -30,6 +30,7 @@ Build the OLS Sociology Agentic Research Stack (Phase A1 bring-up after Phase 0)
   - `http://localhost:3000/api/public/health` returns `200` (Langfuse).
   - `http://localhost:4000/health` returns `200` with LiteLLM auth header.
   - LiteLLM mock completion returns `200` with response content `pong`.
+- Docker daemon access verified in refreshed shell context via `newgrp docker` (`docker ps`, `docker info` both succeed).
 - Sherpa workflow now validates `claims.jsonl`, `glossary.jsonl`, and `summary_metadata.json` against JSONSchemas before artifact writes.
 - Tests added under `tests/test_sherpa_schema_validation.py`; `make test` passes (`4 passed`).
 
@@ -39,6 +40,7 @@ Build the OLS Sociology Agentic Research Stack (Phase A1 bring-up after Phase 0)
 - Docker context: `default` (unix:///var/run/docker.sock).
 - Docker socket permissions: `/var/run/docker.sock` is owned by `root:docker`.
 - Current shell groups still do not include `docker`; direct `docker ps` fails unless using refreshed login/session.
+- In `newgrp docker` context, docker group is active and daemon access works.
 - `scripts/docker_compose.sh` successfully runs docker commands via `sg docker` fallback.
 - Disk free: `/` has ~51G free, `/home` has ~11G free (94% used).
 
