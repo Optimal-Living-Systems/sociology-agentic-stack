@@ -66,6 +66,19 @@ SERVICE ?=
 logs: ## Tail infra logs. Usage: make logs SERVICE=litellm
 	@$(COMPOSE) logs -f --tail=100 $(SERVICE)
 
+.PHONY: kestra-wait
+kestra-wait: ## Wait until Kestra API is healthy (use after make up)
+	@echo "=== Waiting for Kestra at $(KESTRA_URL) ==="
+	@for i in $$(seq 1 60); do \
+		if curl -fsS "$(KESTRA_URL)/api/v1/configs" >/dev/null 2>&1; then \
+			echo "  ✓ Kestra is ready"; \
+			break; \
+		fi; \
+		echo "  ... waiting ($$i/60)"; \
+		sleep 3; \
+		if [ $$i -eq 60 ]; then echo "  ✗ Kestra did not become ready in time"; exit 1; fi; \
+	done
+
 .PHONY: kestra-health
 kestra-health: ## Check Kestra API reachability and auth
 	@echo "=== Checking Kestra health at $(KESTRA_URL) ==="

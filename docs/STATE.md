@@ -1,14 +1,14 @@
 # Project State
 
 **Date:** 2026-03-05
-**Time:** 10:49 EST
+**Time:** 11:00 EST
 
 ## Project Goal
 Build the OLS Sociology Agentic Research Stack (Phase A1 bring-up after Phase 0).
 
 ## Phase Status
 - Phase 0: Complete.
-- Phase A1: In progress, with durable Kestra runtime deps and real local LiteLLM completions validated.
+- Phase A1: Complete. Stack is end-to-end validated and practically usable.
 
 ## What Is Implemented
 - Schema pack, ontology, JSONSchemas, and templates under `schemas/`.
@@ -20,52 +20,45 @@ Build the OLS Sociology Agentic Research Stack (Phase A1 bring-up after Phase 0)
   - LiteLLM
   - Ollama (in-stack)
   - Kestra + dedicated Postgres
-- Kestra service now uses a custom image (`kestra/Dockerfile`) with `requirements.lock` preinstalled.
-- `make kestra-build` target added; `make kestra-install-deps` retained as compatibility alias.
-- `run_session.py` now performs a real LiteLLM completion call in non-dry mode and records the model output in `artifacts/summary.md`.
-- Kestra flows remain on process runner + `python3`:
-  - `kestra/flows/research_session.yaml`
-  - `kestra/flows/corpus_ingest.yaml`
+- Kestra service uses a custom image (`kestra/Dockerfile`) with `requirements.lock` preinstalled.
+- `make kestra-build` builds the image; `make kestra-install-deps` is a compatibility alias.
+- LiteLLM routes `synthesis` and `analysis` aliases to in-stack Ollama (`llama3.2:latest`).
+- `run_session.py` performs a real LiteLLM completion call and records model output in `artifacts/summary.md`.
+- `make kestra-wait` target added to reliably wait for Kestra readiness after cold start.
+- `docs/RUNBOOK.md` updated with golden path (section 0) and improved troubleshooting (section 12).
 
-## Verified Green (This Session)
-- Custom Kestra image built and running:
-  - Service image: `sociology-agentic-stack/kestra:v1.3.0-py`
-  - In-container imports verified: `sherpa_ai`, `langfuse`, `instructor`, `lancedb`
-- Kestra API/auth/flow operations verified after recreate:
-  - `make kestra-health`
-  - `make kestra-import`
-- Ollama reachability from LiteLLM container verified:
-  - `OLLAMA_BASE_URL=http://ollama:11434`
-  - `/api/tags` returns `200`
-- Real LiteLLM completion checks succeeded:
-  - `model=synthesis` returned non-empty content
-  - `model=analysis` returned non-empty content
-- Non-dry CLI path with real model call succeeded:
-  - `python scripts/run_session.py --query ... --taxonomy-seeds ...`
-  - Artifacts contain populated `## Model Insight (LiteLLM)` block
-  - `artifacts/summary.metadata.json` shows `"model_used": "synthesis"`
-- Non-dry Kestra path with real model call succeeded:
-  - Triggered execution: `wmErqrj05WwdugeiV1fdb`
-  - Final state: `SUCCESS`
-  - `artifacts/summary.md` updated with Kestra query + model-generated insight
-- Python tests still pass: `make test` -> `4 passed`
+## Verified Green (Phase A1 Final)
+- All services healthy after `make up`: kestra, kestra-postgres, langfuse-web, langfuse-worker, litellm, ollama, postgres, clickhouse, redis, minio.
+- `make kestra-health` → both endpoints reachable.
+- `make kestra-import` → research_session + corpus_ingest imported successfully.
+- `make ingest SOURCE_DIR=data/corpus` → execution CREATED (execution: `TrW2DV7E89nua5oPDKFXE`).
+- `make kestra-run QUERY=... SEEDS=...` → execution SUCCESS in ~7s (execution: `1lc4gPlgfW1sMHwV1uacwa`).
+- `make session QUERY=... SEEDS=...` → real model call, artifacts populated, `summary.md` contains `## Model Insight (LiteLLM)`.
+- `make test` → 4 passed.
 
 ## Current Environment Facts
 - OS: Ubuntu 24.04.4 LTS.
 - Hardware: AMD 16-core CPU, 128GB RAM, RTX 3060 12GB.
 - Docker context: `default` (`unix:///var/run/docker.sock`).
-- In this shell, direct `docker` access still fails without refreshed group session; `scripts/docker_compose.sh` wrapper works.
+- In this shell, direct `docker` access requires refreshed group session; `scripts/docker_compose.sh` wrapper works.
 - Kestra version in container: `1.3.0`.
+- Local model: `llama3.2:latest` pulled (2.0 GB).
 
-## Known Issues / Remaining Work
-- Direct `docker` group access in current login shell still needs a refreshed session (`sg docker` wrapper remains necessary).
-- NVML (`nvidia-smi`) issue remains deferred.
+## Known Issues / Gaps
+- Direct `docker` group access in current login shell needs a refreshed session (`sg docker` wrapper works).
+- NVML (`nvidia-smi`) issue deferred — does not affect CPU inference.
+- No git remote configured; push to GitHub pending.
 
-## Next Steps (Strict Order)
-1. Commit durable Kestra image milestone (`phase-a1/*`).
-2. Commit LiteLLM+Ollama real completion milestone (`phase-a1/*`).
-3. If desired, tune model aliases/prompts for tighter deterministic formatting from local models.
-4. Continue toward Phase A1 done criteria and final cleanup commit.
+## One-Time Bootstrap Checklist (Fresh Machine)
+1. `cp .env.example .env` (edit if needed)
+2. `make setup`
+3. `make up`
+4. `make kestra-wait`
+5. `make kestra-init-auth`
+6. `./scripts/docker_compose.sh exec -T ollama ollama pull llama3.2:latest`
+7. `make kestra-import`
+
+See `docs/RUNBOOK.md` section 0 for the full golden path.
 
 ## Safety Notes
 - No destructive cleanup commands were run in this phase.
