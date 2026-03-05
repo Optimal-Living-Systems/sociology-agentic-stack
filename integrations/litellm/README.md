@@ -11,10 +11,11 @@ routing endpoint. The proxy is the only model gateway used by Sherpa and review 
 ## Expected Environment Variables
 
 - `LITELLM_MASTER_KEY`
-- `OPENAI_API_KEY`
-- `ANTHROPIC_API_KEY`
-- `MISTRAL_API_KEY`
-- `OLLAMA_BASE_URL`
+- `OLLAMA_BASE_URL` (default in compose: `http://ollama:11434`)
+- Optional for external providers:
+  - `OPENAI_API_KEY`
+  - `ANTHROPIC_API_KEY`
+  - `MISTRAL_API_KEY`
 
 ## Start (CLI)
 

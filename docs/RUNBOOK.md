@@ -6,7 +6,6 @@
 - Python 3.12+
 - Docker + Docker Compose
 - Git
-- Optional: Ollama for local model path
 
 ## 2) Clone and Enter Repo
 
@@ -37,6 +36,7 @@ make validate-schemas
 ## 6) Run End-to-End Smoke
 
 ```bash
+make up
 make smoke
 ```
 
@@ -64,7 +64,7 @@ make ingest
 ```bash
 make up
 make kestra-init-auth
-make kestra-install-deps
+make kestra-build
 make kestra-health
 make kestra-import
 make kestra-run QUERY="How do neighborhood institutions affect youth civic participation?" \
@@ -76,9 +76,14 @@ make kestra-run QUERY="How do neighborhood institutions affect youth civic parti
 
 ## 11) Langfuse + LiteLLM Integration
 
-- [TODO][Phase B1] Start Langfuse stack and generate project keys.
-- [TODO][Phase B1] Start LiteLLM proxy with production router config.
-- [TODO][Phase B2] Route Sherpa calls through LiteLLM endpoint.
+- LiteLLM endpoint: `http://localhost:4000/v1`
+- Ollama endpoint (in-stack): `http://localhost:11434`
+- Default local model aliases `synthesis` and `analysis` are routed to Ollama (`llama3.2:latest`).
+- First-time model bootstrap:
+
+```bash
+./scripts/docker_compose.sh exec -T ollama ollama pull llama3.2:latest
+```
 
 ## 12) Troubleshooting
 

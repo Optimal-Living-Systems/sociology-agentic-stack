@@ -11,12 +11,14 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
 import yaml
+from openai import OpenAI
 
 from _common import configure_logging, ensure_dir, load_environment, require_file
 
@@ -28,6 +30,37 @@ if str(REPO_ROOT) not in sys.path:
 from integrations.langfuse.tracing import LangfuseTracer, build_metadata  # noqa: E402
 
 LOGGER = logging.getLogger("run_session")
+
+
+def fetch_model_insight(query: str, taxonomy_seeds: list[str], model_config: str) -> tuple[str, str]:
+    """Call LiteLLM once and return generated markdown plus model alias used."""
+    base_url = os.getenv("LITELLM_BASE_URL", "http://localhost:4000/v1")
+    api_key = os.getenv("LITELLM_MASTER_KEY", "sk-litellm-dev")
+    model_alias = "synthesis" if model_config == "default" else model_config
+
+    client = OpenAI(base_url=base_url, api_key=api_key)
+    user_prompt = (
+        "Provide 3 concise bullet points about this sociology query.\n"
+        f"Query: {query}\n"
+        f"Taxonomy seeds: {', '.join(taxonomy_seeds) if taxonomy_seeds else '<none>'}\n"
+        "Keep each bullet under 20 words."
+    )
+    response = client.chat.completions.create(
+        model=model_alias,
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a sociology research assistant. Respond in markdown bullets only.",
+            },
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.2,
+        max_tokens=220,
+    )
+    content = (response.choices[0].message.content or "").strip()
+    if not content:
+        raise RuntimeError("LiteLLM returned empty response content.")
+    return content, model_alias
 
 
 def parse_args() -> argparse.Namespace:
@@ -181,10 +214,22 @@ def main() -> int:
                     elif state == "RETRIEVE_WEB":
                         LOGGER.info("RETRIEVE_WEB complete (placeholder).")
                     elif state == "SYNTHESIZE":
+                        model_insight = ""
+                        model_used = args.model_config
+                        if not args.dry_run:
+                            model_insight, model_used = fetch_model_insight(
+                                query=args.query,
+                                taxonomy_seeds=seed_nodes,
+                                model_config=args.model_config,
+                            )
+                            LOGGER.info("SYNTHESIZE model call complete (model=%s).", model_used)
                         summary = f"""# Sociology Research Summary
 
 ## Query
 {args.query}
+
+## Model Insight (LiteLLM)
+{model_insight if model_insight else "- Dry-run: model call skipped."}
 
 ## Core Findings
 - Civic disengagement is associated with lower institutional trust [S001].
@@ -251,7 +296,7 @@ def main() -> int:
                             "taxonomy_seeds": seed_nodes,
                             "sources_cited": 5,
                             "schema_pack_version": args.schema_pack_version,
-                            "model_used": args.model_config,
+                            "model_used": model_used,
                             "timestamp": timestamp,
                         }
                     elif state == "CRITIQUE":
