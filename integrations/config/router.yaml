@@ -1,0 +1,41 @@
+# Router configuration for the OLS Agentic Sociology Research Stack.
+# This file is read by orchestration code to pick model aliases and policies.
+
+router:
+  # Base URL for the LiteLLM proxy (OpenAI-compatible).
+  base_url: "http://localhost:4000/v1"
+  # The API key used to authenticate to the LiteLLM proxy.
+  api_key_env: "LITELLM_MASTER_KEY"
+
+  # Default model aliases used by workflows.
+  defaults:
+    synthesis_model: "synthesis"
+    analysis_model: "analysis"
+    critique_model: "local_qwen"
+    extraction_model: "mistral_synthesis"
+
+  # Provider metadata (documentation-only).
+  providers:
+    - name: "openai"
+      env_keys: ["OPENAI_API_KEY"]
+      notes: "Primary API provider for high-quality synthesis."
+    - name: "anthropic"
+      env_keys: ["ANTHROPIC_API_KEY"]
+      notes: "Backup synthesis provider and long-context reasoning."
+    - name: "mistral"
+      env_keys: ["MISTRAL_API_KEY"]
+      notes: "Alternative provider for cost control."
+    - name: "ollama"
+      env_keys: ["OLLAMA_BASE_URL"]
+      notes: "Local model serving path for Qwen/Mistral on RTX 3060."
+
+  # Fallback chains used by the runner (not LiteLLM router settings).
+  fallbacks:
+    synthesis:
+      - "synthesis"
+      - "claude_synthesis"
+      - "mistral_synthesis"
+    critique:
+      - "local_qwen"
+      - "local_mistral"
+      - "analysis"

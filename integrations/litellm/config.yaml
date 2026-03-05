@@ -1,0 +1,60 @@
+# LiteLLM Proxy configuration
+# This file is loaded by the LiteLLM proxy server to expose a single OpenAI-compatible gateway.
+# All secrets are read from environment variables (no hard-coded keys).
+
+model_list:
+  # --- API providers ---
+  - model_name: "synthesis"
+    litellm_params:
+      # OpenAI-compatible model id in LiteLLM format
+      model: "openai/gpt-4o-mini"
+      api_key: "os.environ/OPENAI_API_KEY"
+
+  - model_name: "analysis"
+    litellm_params:
+      model: "openai/gpt-4o"
+      api_key: "os.environ/OPENAI_API_KEY"
+
+  - model_name: "claude_synthesis"
+    litellm_params:
+      model: "anthropic/claude-3-7-sonnet"
+      api_key: "os.environ/ANTHROPIC_API_KEY"
+
+  - model_name: "mistral_synthesis"
+    litellm_params:
+      model: "mistral/mistral-large"
+      api_key: "os.environ/MISTRAL_API_KEY"
+
+  # --- Local providers (via Ollama; OpenAI-compatible) ---
+  - model_name: "local_qwen"
+    litellm_params:
+      model: "ollama/qwen2.5:7b"
+      api_base: "os.environ/OLLAMA_BASE_URL"
+
+  - model_name: "local_mistral"
+    litellm_params:
+      model: "ollama/mistral:7b"
+      api_base: "os.environ/OLLAMA_BASE_URL"
+
+# Router behavior for LiteLLM.
+router_settings:
+  # Simple shuffling balances load across replicas of the same model_name.
+  routing_strategy: "simple-shuffle"
+  # Aliases let clients request a logical name (e.g., "synthesis") while routing to real models.
+  model_group_alias:
+    synthesis: "analysis"
+
+# LiteLLM module settings.
+litellm_settings:
+  # Conservative retries + timeouts for research runs.
+  num_retries: 2
+  request_timeout: 60
+  # Failover is explicit; keep simple for MVP.
+  allowed_fails: 2
+
+# General proxy settings.
+general_settings:
+  # Master key required for all proxy requests.
+  master_key: "os.environ/LITELLM_MASTER_KEY"
+  # JSON logs are easier to parse and ship to observability backends.
+  json_logs: true
