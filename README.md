@@ -45,6 +45,7 @@ make review
 
 ## Documentation Index
 
+- [User Manual](docs/USER_MANUAL.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Runbook](docs/RUNBOOK.md)
 - [Acceptance Tests](docs/ACCEPTANCE_TESTS.md)
