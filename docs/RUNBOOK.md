@@ -59,20 +59,35 @@ make review
 make ingest
 ```
 
-## 10) Langfuse + LiteLLM Integration
+## 10) Kestra Setup (Included in Compose Stack)
+
+```bash
+make up
+make kestra-init-auth
+make kestra-install-deps
+make kestra-health
+make kestra-import
+make kestra-run QUERY="How do neighborhood institutions affect youth civic participation?" \
+  SEEDS="civic_disengagement,social_capital"
+```
+
+- Kestra UI/API: `http://localhost:8080`
+- Default dev auth: `admin@kestra.io` / `Kestra123`
+
+## 11) Langfuse + LiteLLM Integration
 
 - [TODO][Phase B1] Start Langfuse stack and generate project keys.
 - [TODO][Phase B1] Start LiteLLM proxy with production router config.
 - [TODO][Phase B2] Route Sherpa calls through LiteLLM endpoint.
 
-## 11) Troubleshooting
+## 12) Troubleshooting
 
 - If `pip install` fails due network: verify DNS and rerun setup.
 - If Docker daemon is down: `sudo systemctl start docker`.
 - If GPU NVML fails: reboot and validate NVIDIA driver/userspace alignment.
 - If schema validation fails: run `python scripts/validate_schema_pack.py --log-level DEBUG`.
 
-## 12) Reproducibility Notes
+## 13) Reproducibility Notes
 
 - Keep `.env` local and never commit secrets.
 - Always run with versioned schema pack (`schemas/pack_manifest.yaml`).

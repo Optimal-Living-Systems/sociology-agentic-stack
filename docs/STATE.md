@@ -1,83 +1,88 @@
 # Project State
 
 **Date:** 2026-03-05
-**Time:** 02:25 EST
+**Time:** 03:41 EST
 
 ## Project Goal
 Build the OLS Sociology Agentic Research Stack (Phase A1 bring-up after Phase 0).
 
 ## Phase Status
-- Phase 0: Complete (scaffold, schemas, scripts, docs, Makefile).
-- Phase A1: In progress (core bring-up complete; disk headroom + session group refresh still open).
+- Phase 0: Complete.
+- Phase A1: In progress, with Kestra now integrated and validated in-stack.
 
 ## What Is Implemented
-- Schema pack: `schemas/pack_manifest.yaml`, `schemas/ontology.yaml`, JSONSchemas under `schemas/artifact_schemas/`, templates under `schemas/templates/`.
-- State machines: `state_machines/sociology_session.json`, `state_machines/review_session.json`.
-- Kestra flows: `kestra/flows/research_session.yaml`, `kestra/flows/corpus_ingest.yaml`.
-- LiteLLM router config: `integrations/litellm/config.yaml` and `integrations/config/router.yaml`.
-- Langfuse adapter: `integrations/langfuse/tracing.py` with README.
-- CLI scripts: `scripts/run_session.py`, `scripts/run_review.py`, `scripts/run_sherpa_workflow.py`, `scripts/sync_prompts_to_langfuse.py`, `scripts/validate_schema_pack.py`.
-- Compose infra file: `compose.yaml` (Langfuse + dependencies + LiteLLM).
-- Docker wrapper script: `scripts/docker_compose.sh` (falls back to `sg docker` and local no-creds Docker config when needed).
-- Make targets: `make up`, `make down`, `make logs`, `make test`, plus existing targets.
+- Schema pack, ontology, JSONSchemas, and templates under `schemas/`.
+- State machines under `state_machines/`.
+- CLI scripts: `run_session.py`, `run_review.py`, `run_sherpa_workflow.py`, prompt sync, schema validation, smoke.
+- Sherpa workflow schema validation now enforced before artifact writes.
+- Langfuse tracing integration in `run_session.py` and `run_review.py`.
+- Compose infra stack in `compose.yaml`:
+  - Langfuse + Postgres + ClickHouse + Redis + Minio
+  - LiteLLM
+  - Kestra + dedicated Postgres
+- Docker wrapper script `scripts/docker_compose.sh` with `sg docker` and no-creds fallback support.
+- Make targets for infra + Kestra operations:
+  - `make up/down/logs/test`
+  - `make kestra-init-auth`
+  - `make kestra-install-deps`
+  - `make kestra-health`
+  - `make kestra-import`
+  - `make kestra-run`
+  - `make ingest`
+- Kestra flows updated to use process runner + `python3`:
+  - `kestra/flows/research_session.yaml`
+  - `kestra/flows/corpus_ingest.yaml`
 
-## Verified Green
-- Git history shows Phase 0 + A1 prep commits (see `git log --oneline`).
-- Schema pack parsing passes via `scripts/validate_schema_pack.py`.
-- Langfuse tracing is wired into `run_session.py` and `run_review.py`.
-- Infra compose stack starts successfully via `make up`.
-- Endpoint smoke checks:
-  - `http://localhost:3000/api/public/health` returns `200` (Langfuse).
-  - `http://localhost:4000/health` returns `200` with LiteLLM auth header.
-  - LiteLLM mock completion returns `200` with response content `pong`.
-- Docker daemon access verified in refreshed shell context via `newgrp docker` (`docker ps`, `docker info` both succeed).
-- Sherpa workflow now validates `claims.jsonl`, `glossary.jsonl`, and `summary_metadata.json` against JSONSchemas before artifact writes.
-- Tests added under `tests/test_sherpa_schema_validation.py`; `make test` passes (`4 passed`).
+## Verified Green (This Session)
+- Disk readiness:
+  - `/` free: ~47G
+  - `/home` free: ~76G
+- Docker stack is running; Kestra is healthy.
+- Kestra config endpoint reports `isBasicAuthInitialized: true`.
+- Kestra API pathing corrected to `/api/v1/main/*` for flow import/execution.
+- End-to-end Kestra target sequence succeeds:
+  - `make kestra-init-auth`
+  - `make kestra-health`
+  - `make kestra-install-deps`
+  - `make kestra-import`
+  - `make ingest SOURCE_DIR=data/corpus`
+  - `make kestra-run QUERY=... SEEDS=...`
+- Latest verification executions completed `SUCCESS`:
+  - `363OcefWdA3ZSHLOAvaL8s` (corpus-ingest)
+  - `2uT12D5dVYomm8VqBDCBzV` (sociology-research-session)
+- Python test suite passes: `make test` -> `4 passed`.
+- Langfuse health endpoint returns `200`.
 
 ## Current Environment Facts
 - OS: Ubuntu 24.04.4 LTS.
 - Hardware: AMD 16-core CPU, 128GB RAM, RTX 3060 12GB.
-- Docker context: `default` (unix:///var/run/docker.sock).
-- Docker socket permissions: `/var/run/docker.sock` is owned by `root:docker`.
-- Current shell groups still do not include `docker`; direct `docker ps` fails unless using refreshed login/session.
-- In `newgrp docker` context, docker group is active and daemon access works.
-- `scripts/docker_compose.sh` successfully runs docker commands via `sg docker` fallback.
-- Disk free: `/` has ~51G free, `/home` has ~11G free (94% used).
+- Docker context: `default` (`unix:///var/run/docker.sock`).
+- In this shell, direct `docker` access still fails without refreshed group session; `sg docker`/wrapper works.
+- Kestra version in container: `1.3.0`.
 
-## Known Blockers / Issues
-- Docker CLI permission denied in current shell without `newgrp docker`/re-login (mitigated by wrapper script fallback).
-- NVML (nvidia-smi) still fails (driver issue), deferred unless needed.
-- Disk headroom on `/home` below 25–30GB target.
-- Kestra endpoint is not reachable at `http://localhost:8080` (optional unless ingest flow is required now).
-
-## Disk Cleanup Candidates (Not Executed)
-- `/home/joel/.lmstudio` (~82G)
-- `/home/joel/.docker` (~20G)
-- `/home/joel/.local` (~15G)
-- `/home/joel/llm` (~5.6G)
-- `/home/joel/.cache` (~4.6G)
-
-## Safe Cleanup Suggestions (No Action Taken Yet)
-1. Remove unused Docker artifacts: `docker system df` then targeted `docker image prune` / `docker builder prune`.
-2. Trim model caches not actively used (`.lmstudio`, `llm`, `.ollama`) after confirming active projects.
-3. Clear package/tool caches (`~/.cache`, `~/.npm`) where safe.
+## Known Issues / Remaining Work
+- LiteLLM is reachable, but provider routes are not currently usable without real upstream credentials/connectivity:
+  - `synthesis/analysis` need valid `OPENAI_API_KEY`.
+  - local Ollama routes are currently unreachable from container (`host.docker.internal` resolution/connectivity issue in this environment).
+- `make kestra-install-deps` installs into the running Kestra container; it must be re-run if Kestra container is recreated.
+  - Recommended follow-up: build a custom Kestra image with Python deps baked in (or startup bootstrap script).
+- NVML (`nvidia-smi`) issue remains deferred.
 
 ## What “Phase A1 Done” Means
-- Docker daemon accessible from shell without permission errors.
-- Disk headroom >= 25–30GB on `/home` or documented safe cleanup path.
-- Langfuse + LiteLLM reachable via compose or documented external services.
-- Smoke tests pass (Langfuse reachable, LiteLLM basic completion, Kestra reachable if used).
-- Sherpa runner validates outputs against JSONSchemas.
-- `docs/STATE.md` reflects current status and git clean.
+- Docker access in active login shell is clean (no `sg docker` fallback needed).
+- Langfuse + LiteLLM + Kestra are up and reachable.
+- Kestra flows import and execute successfully (now true).
+- LiteLLM real completion test passes using configured provider keys or local model backend.
+- Sherpa schema validation and tests remain green.
+- `docs/STATE.md` reflects final state and worktree is clean after commit.
 
 ## Next Steps (Strict Order)
-1. Refresh shell group membership (`newgrp docker` or re-login) so direct `docker` commands work without fallback.
-2. Free `/home` space to reach at least 25–30GB headroom, then re-run `df -h /home`.
-3. Decide whether to bring Kestra into compose or keep it as an external dependency and document that choice.
-4. Run end-to-end workflow smoke with real provider keys (non-mock LiteLLM completion + Sherpa run).
-5. Keep `docs/STATE.md` current after each material infra/runtime change.
+1. Commit current Kestra integration milestone.
+2. Decide and implement durable Kestra Python dependency strategy (custom image preferred).
+3. Configure real provider key(s) and/or fix Ollama host reachability for LiteLLM.
+4. Run non-dry real session path via CLI and via Kestra, then capture outputs in docs.
+5. Update `docs/STATE.md` again after those runtime validations.
 
 ## Safety Notes
-- No destructive commands.
-- Keep changes small and commit frequently.
-- Verify with commands before assuming state.
+- No destructive cleanup commands were run in this phase.
+- Changes were incremental and verified with live commands.

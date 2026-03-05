@@ -18,12 +18,13 @@ tasks:
     type: io.kestra.plugin.scripts.shell.Commands
     description: "Run ingestion script (implemented in later phase)."
     warningOnStdErr: false
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
     commands:
       - |
         set -e
         cd /home/joel/work/sociology-agentic-stack
-        source .venv/bin/activate
-        python scripts/run_session.py \
+        python3 scripts/run_session.py \
           --query "Corpus ingest dry run" \
           --taxonomy-seeds "social_capital" \
           --corpus-id "{{ inputs.corpus_id }}" \

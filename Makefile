@@ -20,6 +20,11 @@ VENV := .venv/bin/activate
 PYTHON := source $(VENV) && python
 COMPOSE_FILE ?= compose.yaml
 COMPOSE := ./scripts/docker_compose.sh
+KESTRA_URL ?= http://localhost:8080
+KESTRA_API_PREFIX ?= /api/v1/main
+KESTRA_USERNAME ?= admin@kestra.io
+KESTRA_PASSWORD ?= Kestra123
+KESTRA_AUTH ?= $(KESTRA_USERNAME):$(KESTRA_PASSWORD)
 
 .DEFAULT_GOAL := help
 
@@ -61,12 +66,69 @@ SERVICE ?=
 logs: ## Tail infra logs. Usage: make logs SERVICE=litellm
 	@$(COMPOSE) logs -f --tail=100 $(SERVICE)
 
+.PHONY: kestra-health
+kestra-health: ## Check Kestra API reachability and auth
+	@echo "=== Checking Kestra health at $(KESTRA_URL) ==="
+	@curl -fsS "$(KESTRA_URL)/api/v1/configs" >/dev/null \
+		&& echo "  ✓ Kestra configs endpoint reachable" \
+		|| (echo "  ✗ Kestra configs endpoint unreachable"; exit 1)
+	@curl -fsS -u "$(KESTRA_AUTH)" "$(KESTRA_URL)$(KESTRA_API_PREFIX)/flows/search" >/dev/null \
+		&& echo "  ✓ Kestra reachable" \
+		|| (echo "  ✗ Kestra not reachable"; exit 1)
+
+.PHONY: kestra-init-auth
+kestra-init-auth: ## Initialize Kestra basic auth account (one-time in fresh DB)
+	@echo "=== Initializing Kestra basic auth (if needed) ==="
+	@if curl -fsS "$(KESTRA_URL)/api/v1/configs" | grep -q '"isBasicAuthInitialized":true'; then \
+		echo "  ✓ Basic auth already initialized"; \
+	else \
+		curl -fsS -X POST "$(KESTRA_URL)$(KESTRA_API_PREFIX)/basicAuth" \
+			-H "Content-Type: application/json" \
+			-d '{"uid":"ols-dev-bootstrap","username":"$(KESTRA_USERNAME)","password":"$(KESTRA_PASSWORD)"}' >/dev/null && \
+		echo "  ✓ Basic auth initialized for $(KESTRA_USERNAME)"; \
+	fi
+
+.PHONY: kestra-import
+kestra-import: ## Import Kestra flows from kestra/flows/*.yaml
+	@echo "=== Importing Kestra flows ==="
+	@curl -fsS -u "$(KESTRA_AUTH)" -X POST "$(KESTRA_URL)$(KESTRA_API_PREFIX)/flows/import" \
+		-H "Content-Type: multipart/form-data" \
+		-F "fileUpload=@kestra/flows/research_session.yaml" >/dev/null
+	@curl -fsS -u "$(KESTRA_AUTH)" -X POST "$(KESTRA_URL)$(KESTRA_API_PREFIX)/flows/import" \
+		-H "Content-Type: multipart/form-data" \
+		-F "fileUpload=@kestra/flows/corpus_ingest.yaml" >/dev/null
+	@echo "  ✓ Imported research_session + corpus_ingest"
+
+.PHONY: kestra-run
+kestra-run: ## Trigger Kestra research session flow using QUERY/SEEDS vars
+	@echo "=== Triggering Kestra research session flow ==="
+	@curl -fsS -u "$(KESTRA_AUTH)" -X POST "$(KESTRA_URL)$(KESTRA_API_PREFIX)/executions/ols.research/sociology-research-session" \
+		-H "Content-Type: multipart/form-data" \
+		-F "query=$(QUERY)" \
+		-F "taxonomy_seeds=$(SEEDS)" \
+		-F "model_config=$(MODEL_CONFIG)" \
+		-F "corpus_id=$(CORPUS)" \
+		-F "schema_pack_version=$(SCHEMA_VERSION)"
+	@echo ""
+	@echo "=== Kestra execution triggered ==="
+
+.PHONY: kestra-logs
+kestra-logs: ## Tail Kestra container logs
+	@$(COMPOSE) logs -f --tail=200 kestra
+
+.PHONY: kestra-install-deps
+kestra-install-deps: ## Install Python deps inside Kestra container for flow scripts
+	@echo "=== Installing Python dependencies inside Kestra container ==="
+	@$(COMPOSE) exec -T kestra sh -lc "pip3 install -r /home/joel/work/sociology-agentic-stack/requirements.lock"
+	@echo "  ✓ Kestra Python dependencies installed"
+
 # --- Research Session ---
 QUERY ?= Sociological drivers of civic disengagement in urban youth
 SEEDS ?= civic_participation,urban_inequality
 MODEL_CONFIG ?= default
 CORPUS ?= sociology
 SCHEMA_VERSION ?= 1.0.0
+SOURCE_DIR ?= data/corpus
 
 .PHONY: session
 session: ## Run a research session. Usage: make session QUERY="your question" SEEDS="topic1,topic2"
@@ -136,8 +198,10 @@ sync-prompts-apply: ## Push prompt templates to Langfuse (apply mode)
 .PHONY: ingest
 ingest: ## Trigger Kestra corpus ingestion flow
 	@echo "=== Triggering Kestra corpus ingest ==="
-	@curl -s -X POST http://localhost:8080/api/v1/executions/ols.research/corpus-ingest \
-		-H "Content-Type: application/json" \
+	@curl -s -u "$(KESTRA_AUTH)" -X POST "$(KESTRA_URL)$(KESTRA_API_PREFIX)/executions/ols.research/corpus-ingest" \
+		-H "Content-Type: multipart/form-data" \
+		-F "source_dir=$(SOURCE_DIR)" \
+		-F "corpus_id=$(CORPUS)" \
 		|| echo "  ⚠ Kestra not reachable. Is it running? Check: docker ps"
 	@echo "=== Ingest triggered ==="
 

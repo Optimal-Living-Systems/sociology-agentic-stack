@@ -30,12 +30,13 @@ tasks:
     type: io.kestra.plugin.scripts.shell.Commands
     description: "Execute the main research session script with runtime inputs."
     warningOnStdErr: false
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
     commands:
       - |
         set -e
         cd /home/joel/work/sociology-agentic-stack
-        source .venv/bin/activate
-        python scripts/run_session.py \
+        python3 scripts/run_session.py \
           --query "{{ inputs.query }}" \
           --taxonomy-seeds "{{ inputs.taxonomy_seeds }}" \
           --model-config "{{ inputs.model_config }}" \
@@ -46,12 +47,13 @@ tasks:
     type: io.kestra.plugin.scripts.shell.Commands
     description: "Run review-only artifact audits after synthesis."
     warningOnStdErr: false
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
     commands:
       - |
         set -e
         cd /home/joel/work/sociology-agentic-stack
-        source .venv/bin/activate
-        python scripts/run_review.py \
+        python3 scripts/run_review.py \
           --artifacts-dir artifacts \
           --report-dir docs/review_reports
 
@@ -59,11 +61,12 @@ tasks:
     type: io.kestra.plugin.scripts.shell.Commands
     description: "Archive session artifacts and metadata for reproducibility."
     warningOnStdErr: false
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
     commands:
       - |
         set -e
         cd /home/joel/work/sociology-agentic-stack
-        source .venv/bin/activate
-        python scripts/archive_session.py \
+        python3 scripts/archive_session.py \
           --artifacts-dir artifacts \
           --archive-dir data/archives
