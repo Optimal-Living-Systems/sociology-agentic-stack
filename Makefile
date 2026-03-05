@@ -106,6 +106,12 @@ sync-prompts: ## Push prompt templates to Langfuse
 	$(PYTHON) scripts/sync_prompts_to_langfuse.py
 	@echo "=== Prompt sync complete ==="
 
+.PHONY: sync-prompts-apply
+sync-prompts-apply: ## Push prompt templates to Langfuse (apply mode)
+	@echo "=== Syncing prompts to Langfuse (apply) ==="
+	$(PYTHON) scripts/sync_prompts_to_langfuse.py --apply
+	@echo "=== Prompt sync apply complete ==="
+
 # --- Corpus Ingestion (via Kestra) ---
 .PHONY: ingest
 ingest: ## Trigger Kestra corpus ingestion flow
