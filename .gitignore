@@ -35,11 +35,15 @@ corpus/*
 Thumbs.db
 
 # Langfuse/LiteLLM Docker volumes
-integrations/langfuse/postgres_data/
-integrations/langfuse/clickhouse_data/
-integrations/langfuse/redis_data/
-integrations/litellm/data/
+integrations/langfuse/postgres_data/*
+integrations/langfuse/clickhouse_data/*
+integrations/langfuse/redis_data/*
+integrations/litellm/data/*
+!integrations/langfuse/postgres_data/
 !integrations/langfuse/postgres_data/.gitkeep
+!integrations/langfuse/clickhouse_data/
 !integrations/langfuse/clickhouse_data/.gitkeep
+!integrations/langfuse/redis_data/
 !integrations/langfuse/redis_data/.gitkeep
+!integrations/litellm/data/
 !integrations/litellm/data/.gitkeep
