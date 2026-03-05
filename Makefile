@@ -5,6 +5,7 @@
 #   make setup              Install dependencies and validate environment
 #   make smoke              Run smoke test (validates all components)
 #   make session QUERY="your research question" SEEDS="topic1,topic2"
+#   make sherpa-run QUERY="your research question" SEEDS="topic1,topic2"
 #   make review             Run review agent on latest artifacts
 #   make validate-schemas   Check schema pack for errors
 #   make sync-prompts       Push templates to Langfuse
@@ -59,6 +60,18 @@ session: ## Run a research session. Usage: make session QUERY="your question" SE
 		--corpus-id "$(CORPUS)" \
 		--schema-pack-version "$(SCHEMA_VERSION)"
 	@echo "=== Session complete. Artifacts in artifacts/ ==="
+
+# --- Sherpa Workflow Runner ---
+.PHONY: sherpa-run
+sherpa-run: ## Run Sherpa workflow runner. Usage: make sherpa-run QUERY="your question" SEEDS="topic1,topic2"
+	@echo "=== Starting Sherpa workflow run ==="
+	@echo "  Query: $(QUERY)"
+	@echo "  Seeds: $(SEEDS)"
+	$(PYTHON) scripts/run_sherpa_workflow.py \
+		--query "$(QUERY)" \
+		--taxonomy-seeds "$(SEEDS)" \
+		--use-sherpa
+	@echo "=== Sherpa workflow complete ==="
 
 # --- Dry Run (cost estimation) ---
 .PHONY: dry-run
