@@ -16,10 +16,11 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 from uuid import uuid4
 
 import yaml
+from jsonschema import Draft202012Validator
 
 from _common import configure_logging, load_environment, require_file
 
@@ -137,6 +138,17 @@ def load_templates(schema_root: Path, manifest: dict) -> Dict[str, dict]:
     return templates
 
 
+def load_artifact_schemas(schema_root: Path, manifest: dict) -> Dict[str, dict]:
+    """Load artifact JSON schemas into a schema_name->schema map."""
+    artifact_schemas: Dict[str, dict] = {}
+    for rel_path in manifest["schema_pack"]["artifact_schemas"]:
+        path = schema_root / rel_path
+        require_file(path, f"artifact schema ({rel_path})")
+        schema_name = path.name.replace(".jsonschema", "")
+        artifact_schemas[schema_name] = json.loads(path.read_text(encoding="utf-8"))
+    return artifact_schemas
+
+
 def render_template(text: str, variables: Dict[str, str]) -> str:
     """Render a simple {{var}} template without external dependencies."""
     output = text
@@ -157,6 +169,87 @@ def normalize_jsonl(output: str) -> str:
         except Exception:
             return cleaned
     return cleaned
+
+
+def parse_jsonl_records(output: str, label: str) -> List[dict]:
+    """Parse JSONL text into a list of object records."""
+    cleaned = output.strip()
+    if not cleaned:
+        raise ValueError(f"{label} output is empty.")
+
+    records: List[dict] = []
+    for line_number, line in enumerate(cleaned.splitlines(), start=1):
+        raw_line = line.strip()
+        if not raw_line:
+            continue
+        try:
+            record = json.loads(raw_line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"{label} line {line_number} is not valid JSON: {exc.msg}"
+            ) from exc
+        if not isinstance(record, dict):
+            raise ValueError(f"{label} line {line_number} must be a JSON object.")
+        records.append(record)
+
+    if not records:
+        raise ValueError(f"{label} output has no JSON object records.")
+    return records
+
+
+def validate_records_against_schema(records: List[dict], schema: dict, label: str) -> None:
+    """Validate object records against one JSON schema."""
+    validator = Draft202012Validator(schema)
+    for index, record in enumerate(records, start=1):
+        errors = sorted(validator.iter_errors(record), key=lambda err: list(err.path))
+        if not errors:
+            continue
+        first = errors[0]
+        error_path = ".".join(str(part) for part in first.path) or "<root>"
+        raise ValueError(
+            f"{label} record {index} failed schema validation at {error_path}: {first.message}"
+        )
+
+
+def validate_jsonl_output(output: str, schema: dict, label: str) -> List[dict]:
+    """Parse+validate one JSONL model output and return records."""
+    records = parse_jsonl_records(output, label)
+    validate_records_against_schema(records, schema, label)
+    return records
+
+
+def count_unique_source_refs(claim_records: List[dict], glossary_records: List[dict]) -> int:
+    """Count unique source refs found across claim/glossary outputs."""
+    source_ids: set[str] = set()
+    for record in claim_records:
+        source_ids.update(
+            ref for ref in record.get("evidence_refs", []) if isinstance(ref, str) and ref.strip()
+        )
+    for record in glossary_records:
+        source_ids.update(
+            ref for ref in record.get("source_refs", []) if isinstance(ref, str) and ref.strip()
+        )
+    return len(source_ids)
+
+
+def build_summary_metadata_record(
+    run_id: str,
+    query: str,
+    taxonomy_seeds: List[str],
+    schema_pack_version: str,
+    model_used: str,
+    sources_cited: int,
+) -> Dict[str, Any]:
+    """Build one summary_metadata record for validation and persistence."""
+    return {
+        "run_id": run_id,
+        "query": query or "<no query>",
+        "taxonomy_seeds": taxonomy_seeds,
+        "sources_cited": sources_cited,
+        "schema_pack_version": schema_pack_version,
+        "model_used": model_used,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 def load_router_config(path: Path) -> dict:
@@ -253,6 +346,7 @@ def main() -> int:
 
         manifest = load_schema_pack(schema_root)
         templates = load_templates(schema_root, manifest)
+        artifact_schemas = load_artifact_schemas(schema_root, manifest)
         router_config = load_router_config(router_path)
 
         base_url = router_config["router"]["base_url"]
@@ -264,6 +358,7 @@ def main() -> int:
         claims_out = None
         glossary_out = None
         critique_out = None
+        summary_metadata_out: Dict[str, Any] | None = None
 
         LOGGER.info("Loaded state machine: %s", state_machine.get("name", sm_path.name))
         LOGGER.info("State sequence: %s", " -> ".join(state_sequence))
@@ -368,18 +463,57 @@ def main() -> int:
                         claims_out = normalize_jsonl(claims_out)
                         glossary_out = normalize_jsonl(glossary_out)
 
+                        claims_records = validate_jsonl_output(
+                            claims_out,
+                            artifact_schemas["claim"],
+                            "claims",
+                        )
+                        glossary_records = validate_jsonl_output(
+                            glossary_out,
+                            artifact_schemas["glossary_entry"],
+                            "glossary",
+                        )
+                        summary_metadata_out = build_summary_metadata_record(
+                            run_id=run_id,
+                            query=args.query,
+                            taxonomy_seeds=seed_nodes,
+                            schema_pack_version=manifest["schema_pack"]["version"],
+                            model_used=defaults.get("synthesis_model", args.model),
+                            sources_cited=count_unique_source_refs(
+                                claim_records=claims_records,
+                                glossary_records=glossary_records,
+                            ),
+                        )
+                        validate_records_against_schema(
+                            [summary_metadata_out],
+                            artifact_schemas["summary_metadata"],
+                            "summary_metadata",
+                        )
+
                         LOGGER.info("SYNTHESIZE complete via Sherpa LLM.")
                     elif state == "FINALIZE":
                         if args.dry_run:
                             LOGGER.info("FINALIZE dry-run: skipping artifact writes.")
                             continue
-                        if summary_out is None or claims_out is None or glossary_out is None:
+                        if (
+                            summary_out is None
+                            or claims_out is None
+                            or glossary_out is None
+                            or summary_metadata_out is None
+                        ):
                             raise RuntimeError("SYNTHESIZE did not produce artifacts.")
                         artifacts_dir.mkdir(parents=True, exist_ok=True)
-                        (artifacts_dir / "summary.md").write_text(summary_out)
-                        (artifacts_dir / "claims.jsonl").write_text(claims_out)
-                        (artifacts_dir / "glossary.jsonl").write_text(glossary_out)
-                        (artifacts_dir / "critique.md").write_text(critique_out or "")
+                        (artifacts_dir / "summary.md").write_text(summary_out, encoding="utf-8")
+                        (artifacts_dir / "claims.jsonl").write_text(claims_out, encoding="utf-8")
+                        (artifacts_dir / "glossary.jsonl").write_text(glossary_out, encoding="utf-8")
+                        (artifacts_dir / "critique.md").write_text(
+                            critique_out or "",
+                            encoding="utf-8",
+                        )
+                        (artifacts_dir / "summary_metadata.json").write_text(
+                            json.dumps(summary_metadata_out, indent=2, ensure_ascii=True) + "\n",
+                            encoding="utf-8",
+                        )
                         LOGGER.info("Artifacts written to %s", artifacts_dir)
                     else:
                         LOGGER.info("State %s executed (placeholder)", state)

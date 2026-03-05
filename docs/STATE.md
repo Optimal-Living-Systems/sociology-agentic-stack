@@ -1,14 +1,14 @@
 # Project State
 
 **Date:** 2026-03-05
-**Time:** 02:02 EST
+**Time:** 02:25 EST
 
 ## Project Goal
 Build the OLS Sociology Agentic Research Stack (Phase A1 bring-up after Phase 0).
 
 ## Phase Status
 - Phase 0: Complete (scaffold, schemas, scripts, docs, Makefile).
-- Phase A1: In progress (infra verification and bring-up pending).
+- Phase A1: In progress (core bring-up complete; disk headroom + session group refresh still open).
 
 ## What Is Implemented
 - Schema pack: `schemas/pack_manifest.yaml`, `schemas/ontology.yaml`, JSONSchemas under `schemas/artifact_schemas/`, templates under `schemas/templates/`.
@@ -17,27 +17,48 @@ Build the OLS Sociology Agentic Research Stack (Phase A1 bring-up after Phase 0)
 - LiteLLM router config: `integrations/litellm/config.yaml` and `integrations/config/router.yaml`.
 - Langfuse adapter: `integrations/langfuse/tracing.py` with README.
 - CLI scripts: `scripts/run_session.py`, `scripts/run_review.py`, `scripts/run_sherpa_workflow.py`, `scripts/sync_prompts_to_langfuse.py`, `scripts/validate_schema_pack.py`.
-- Make targets: `make sherpa-run`, `make sync-prompts-apply`, plus base targets.
+- Compose infra file: `compose.yaml` (Langfuse + dependencies + LiteLLM).
+- Docker wrapper script: `scripts/docker_compose.sh` (falls back to `sg docker` and local no-creds Docker config when needed).
+- Make targets: `make up`, `make down`, `make logs`, `make test`, plus existing targets.
 
 ## Verified Green
 - Git history shows Phase 0 + A1 prep commits (see `git log --oneline`).
 - Schema pack parsing passes via `scripts/validate_schema_pack.py`.
 - Langfuse tracing is wired into `run_session.py` and `run_review.py`.
+- Infra compose stack starts successfully via `make up`.
+- Endpoint smoke checks:
+  - `http://localhost:3000/api/public/health` returns `200` (Langfuse).
+  - `http://localhost:4000/health` returns `200` with LiteLLM auth header.
+  - LiteLLM mock completion returns `200` with response content `pong`.
+- Sherpa workflow now validates `claims.jsonl`, `glossary.jsonl`, and `summary_metadata.json` against JSONSchemas before artifact writes.
+- Tests added under `tests/test_sherpa_schema_validation.py`; `make test` passes (`4 passed`).
 
 ## Current Environment Facts
 - OS: Ubuntu 24.04.4 LTS.
 - Hardware: AMD 16-core CPU, 128GB RAM, RTX 3060 12GB.
 - Docker context: `default` (unix:///var/run/docker.sock).
 - Docker socket permissions: `/var/run/docker.sock` is owned by `root:docker`.
-- Current user `joel` is in the `docker` group, but `docker ps` returns permission denied in this session.
-- Disk free: `/` has ~57G free, `/home` has ~11G free (94% used).
+- Current shell groups still do not include `docker`; direct `docker ps` fails unless using refreshed login/session.
+- `scripts/docker_compose.sh` successfully runs docker commands via `sg docker` fallback.
+- Disk free: `/` has ~51G free, `/home` has ~11G free (94% used).
 
 ## Known Blockers / Issues
-- Docker CLI permission denied to `/var/run/docker.sock`. User is in `docker` group but session not refreshed.
+- Docker CLI permission denied in current shell without `newgrp docker`/re-login (mitigated by wrapper script fallback).
 - NVML (nvidia-smi) still fails (driver issue), deferred unless needed.
 - Disk headroom on `/home` below 25–30GB target.
-- Infra services not yet brought up in this repo (no compose file committed here).
-- Schema validation not yet enforced inside `scripts/run_sherpa_workflow.py` outputs.
+- Kestra endpoint is not reachable at `http://localhost:8080` (optional unless ingest flow is required now).
+
+## Disk Cleanup Candidates (Not Executed)
+- `/home/joel/.lmstudio` (~82G)
+- `/home/joel/.docker` (~20G)
+- `/home/joel/.local` (~15G)
+- `/home/joel/llm` (~5.6G)
+- `/home/joel/.cache` (~4.6G)
+
+## Safe Cleanup Suggestions (No Action Taken Yet)
+1. Remove unused Docker artifacts: `docker system df` then targeted `docker image prune` / `docker builder prune`.
+2. Trim model caches not actively used (`.lmstudio`, `llm`, `.ollama`) after confirming active projects.
+3. Clear package/tool caches (`~/.cache`, `~/.npm`) where safe.
 
 ## What “Phase A1 Done” Means
 - Docker daemon accessible from shell without permission errors.
@@ -48,16 +69,11 @@ Build the OLS Sociology Agentic Research Stack (Phase A1 bring-up after Phase 0)
 - `docs/STATE.md` reflects current status and git clean.
 
 ## Next Steps (Strict Order)
-1. Fix Docker socket access: refresh group membership (`newgrp docker` or re-login). Verify `docker ps`.
-2. Record Docker verification in this file and commit if status changes.
-3. Disk readiness: run `df -h /` and `df -h /home`; if `/home` < 25–30GB free, propose safe cleanup.
-4. Add compose file(s) for Langfuse + LiteLLM (and Kestra if needed) or document external services.
-5. Add Make targets: `make up`, `make down`, `make logs` if compose is added.
-6. Bring up infra and verify endpoints (Langfuse UI, LiteLLM /v1).
-7. Update `docs/STATE.md` with infra status and commit.
-8. Enforce JSONSchema validation in `scripts/run_sherpa_workflow.py` before writing artifacts.
-9. Add tests in `tests/` for schema validation pass/fail.
-10. Add `make test` target and run it.
+1. Refresh shell group membership (`newgrp docker` or re-login) so direct `docker` commands work without fallback.
+2. Free `/home` space to reach at least 25–30GB headroom, then re-run `df -h /home`.
+3. Decide whether to bring Kestra into compose or keep it as an external dependency and document that choice.
+4. Run end-to-end workflow smoke with real provider keys (non-mock LiteLLM completion + Sherpa run).
+5. Keep `docs/STATE.md` current after each material infra/runtime change.
 
 ## Safety Notes
 - No destructive commands.
