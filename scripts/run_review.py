@@ -19,6 +19,13 @@ import yaml
 
 from _common import configure_logging, ensure_dir, load_environment, require_file
 
+# Ensure repo root is on sys.path when executing scripts directly.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from integrations.langfuse.tracing import LangfuseTracer, build_metadata  # noqa: E402
+
 LOGGER = logging.getLogger("run_review")
 
 
@@ -47,6 +54,26 @@ def parse_args() -> argparse.Namespace:
         default="review-only",
         choices=["review-only"],
         help="Execution mode. Only review-only is allowed by policy.",
+    )
+    parser.add_argument(
+        "--run-id",
+        default="",
+        help="Optional session run identifier for observability.",
+    )
+    parser.add_argument(
+        "--agent-name",
+        default="roborev",
+        help="Logical agent name for observability metadata.",
+    )
+    parser.add_argument(
+        "--policy-name",
+        default="review_session",
+        help="Policy/workflow name used for observability metadata.",
+    )
+    parser.add_argument(
+        "--corpus-id",
+        default="sociology",
+        help="Corpus identifier for observability metadata.",
     )
     parser.add_argument(
         "--log-level",
@@ -102,46 +129,84 @@ def main() -> int:
 
         ensure_dir(report_dir)
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        run_id = args.run_id or f"review-{timestamp}"
 
-        summary_text = (artifacts_dir / "summary.md").read_text(encoding="utf-8")
-        claims = _read_jsonl(artifacts_dir / "claims.jsonl")
-        glossary = _read_jsonl(artifacts_dir / "glossary.jsonl")
-
-        claim_schema = json.loads(
-            (schema_root / "artifact_schemas/claim.jsonschema").read_text(encoding="utf-8")
-        )
-        glossary_schema = json.loads(
-            (schema_root / "artifact_schemas/glossary_entry.jsonschema").read_text(encoding="utf-8")
+        tracer = LangfuseTracer()
+        trace_meta = build_metadata(
+            run_id=run_id,
+            agent_name=args.agent_name,
+            policy_name=args.policy_name,
+            state_name="LOAD_ARTIFACTS",
+            corpus_id=args.corpus_id,
         )
 
         findings: list[dict] = []
 
-        # Citation integrity audit.
-        if "[S" not in summary_text:
-            findings.append(
-                {
-                    "id": "FIND-CIT-001",
-                    "finding_type": "missing_citation",
-                    "severity": "high",
-                    "description": "Summary has no inline source citation markers.",
-                    "affected_artifact": "artifacts/summary.md",
-                }
-            )
+        report_md = None
+        report_jsonl = None
 
-        for claim in claims:
-            claim_id = claim.get("id", "unknown")
-            refs = claim.get("evidence_refs", [])
-            if not isinstance(refs, list) or not refs:
-                findings.append(
-                    {
-                        "id": f"FIND-CIT-{claim_id}",
-                        "finding_type": "unsupported_claim",
-                        "severity": "high",
-                        "description": "Claim lacks evidence_refs.",
-                        "affected_artifact": "artifacts/claims.jsonl",
-                        "affected_record_id": claim_id,
-                    }
+        with tracer.start_trace(
+            name=args.policy_name,
+            session_id=run_id,
+            metadata=trace_meta,
+        ):
+            # LOAD_ARTIFACTS
+            with tracer.start_span(
+                name="LOAD_ARTIFACTS",
+                metadata=build_metadata(
+                    run_id=run_id,
+                    agent_name=args.agent_name,
+                    policy_name=args.policy_name,
+                    state_name="LOAD_ARTIFACTS",
+                    corpus_id=args.corpus_id,
+                ),
+            ):
+                summary_text = (artifacts_dir / "summary.md").read_text(encoding="utf-8")
+                claims = _read_jsonl(artifacts_dir / "claims.jsonl")
+                glossary = _read_jsonl(artifacts_dir / "glossary.jsonl")
+                claim_schema = json.loads(
+                    (schema_root / "artifact_schemas/claim.jsonschema").read_text(encoding="utf-8")
                 )
+                glossary_schema = json.loads(
+                    (schema_root / "artifact_schemas/glossary_entry.jsonschema").read_text(encoding="utf-8")
+                )
+
+            # CITATION_AUDIT
+            with tracer.start_span(
+                name="CITATION_AUDIT",
+                metadata=build_metadata(
+                    run_id=run_id,
+                    agent_name=args.agent_name,
+                    policy_name=args.policy_name,
+                    state_name="CITATION_AUDIT",
+                    corpus_id=args.corpus_id,
+                ),
+            ):
+                if "[S" not in summary_text:
+                    findings.append(
+                        {
+                            "id": "FIND-CIT-001",
+                            "finding_type": "missing_citation",
+                            "severity": "high",
+                            "description": "Summary has no inline source citation markers.",
+                            "affected_artifact": "artifacts/summary.md",
+                        }
+                    )
+
+                for claim in claims:
+                    claim_id = claim.get("id", "unknown")
+                    refs = claim.get("evidence_refs", [])
+                    if not isinstance(refs, list) or not refs:
+                        findings.append(
+                            {
+                                "id": f"FIND-CIT-{claim_id}",
+                                "finding_type": "unsupported_claim",
+                                "severity": "high",
+                                "description": "Claim lacks evidence_refs.",
+                                "affected_artifact": "artifacts/claims.jsonl",
+                                "affected_record_id": claim_id,
+                            }
+                        )
 
         # Schema audit using jsonschema when available.
         try:
@@ -205,85 +270,126 @@ def main() -> int:
         except ImportError:
             LOGGER.warning("jsonschema is not installed; schema validation checks skipped.")
 
-        # Duplication/inconsistency audit.
-        claim_texts = [c.get("claim_text", "").strip().lower() for c in claims if isinstance(c, dict)]
-        duplicate_claims = [text for text, cnt in Counter(claim_texts).items() if text and cnt > 1]
-        for text in duplicate_claims:
-            findings.append(
-                {
-                    "id": f"FIND-DUP-CLM-{abs(hash(text)) % 10000}",
-                    "finding_type": "duplicate_entry",
-                    "severity": "medium",
-                    "description": f"Duplicate claim_text detected: {text[:120]}",
-                    "affected_artifact": "artifacts/claims.jsonl",
-                }
-            )
+            # SCHEMA_AUDIT
+            with tracer.start_span(
+                name="SCHEMA_AUDIT",
+                metadata=build_metadata(
+                    run_id=run_id,
+                    agent_name=args.agent_name,
+                    policy_name=args.policy_name,
+                    state_name="SCHEMA_AUDIT",
+                    corpus_id=args.corpus_id,
+                ),
+            ):
+                # Schema audit logic is above (jsonschema validation).
+                pass
 
-        term_counter = Counter([
-            g.get("term", "").strip().lower() for g in glossary if isinstance(g, dict)
-        ])
-        for term, cnt in term_counter.items():
-            if term and cnt > 1:
-                findings.append(
-                    {
-                        "id": f"FIND-DUP-TERM-{abs(hash(term)) % 10000}",
-                        "finding_type": "duplicate_entry",
-                        "severity": "medium",
-                        "description": f"Duplicate glossary term detected: {term}",
-                        "affected_artifact": "artifacts/glossary.jsonl",
-                        "affected_record_id": term,
-                    }
-                )
+            # DUPLICATION_AUDIT
+            with tracer.start_span(
+                name="DUPLICATION_AUDIT",
+                metadata=build_metadata(
+                    run_id=run_id,
+                    agent_name=args.agent_name,
+                    policy_name=args.policy_name,
+                    state_name="DUPLICATION_AUDIT",
+                    corpus_id=args.corpus_id,
+                ),
+            ):
+                claim_texts = [
+                    c.get("claim_text", "").strip().lower()
+                    for c in claims
+                    if isinstance(c, dict)
+                ]
+                duplicate_claims = [text for text, cnt in Counter(claim_texts).items() if text and cnt > 1]
+                for text in duplicate_claims:
+                    findings.append(
+                        {
+                            "id": f"FIND-DUP-CLM-{abs(hash(text)) % 10000}",
+                            "finding_type": "duplicate_entry",
+                            "severity": "medium",
+                            "description": f"Duplicate claim_text detected: {text[:120]}",
+                            "affected_artifact": "artifacts/claims.jsonl",
+                        }
+                    )
 
-        # Inconsistency check: same term with multiple distinct definitions.
-        definitions_by_term: dict[str, set[str]] = {}
-        for entry in glossary:
-            term = entry.get("term", "").strip().lower()
-            definition = entry.get("definition", "").strip()
-            if not term:
-                continue
-            definitions_by_term.setdefault(term, set()).add(definition)
-        for term, defs in definitions_by_term.items():
-            if len([d for d in defs if d]) > 1:
-                findings.append(
-                    {
-                        "id": f"FIND-INC-{abs(hash(term)) % 10000}",
-                        "finding_type": "inconsistent_definition",
-                        "severity": "low",
-                        "description": f"Term '{term}' has inconsistent definitions.",
-                        "affected_artifact": "artifacts/glossary.jsonl",
-                        "affected_record_id": term,
-                    }
-                )
+                term_counter = Counter([
+                    g.get("term", "").strip().lower() for g in glossary if isinstance(g, dict)
+                ])
+                for term, cnt in term_counter.items():
+                    if term and cnt > 1:
+                        findings.append(
+                            {
+                                "id": f"FIND-DUP-TERM-{abs(hash(term)) % 10000}",
+                                "finding_type": "duplicate_entry",
+                                "severity": "medium",
+                                "description": f"Duplicate glossary term detected: {term}",
+                                "affected_artifact": "artifacts/glossary.jsonl",
+                                "affected_record_id": term,
+                            }
+                        )
 
-        report_md = report_dir / f"review_report_{timestamp}.md"
-        report_jsonl = report_dir / f"review_findings_{timestamp}.jsonl"
+                definitions_by_term: dict[str, set[str]] = {}
+                for entry in glossary:
+                    term = entry.get("term", "").strip().lower()
+                    definition = entry.get("definition", "").strip()
+                    if not term:
+                        continue
+                    definitions_by_term.setdefault(term, set()).add(definition)
+                for term, defs in definitions_by_term.items():
+                    if len([d for d in defs if d]) > 1:
+                        findings.append(
+                            {
+                                "id": f"FIND-INC-{abs(hash(term)) % 10000}",
+                                "finding_type": "inconsistent_definition",
+                                "severity": "low",
+                                "description": f"Term '{term}' has inconsistent definitions.",
+                                "affected_artifact": "artifacts/glossary.jsonl",
+                                "affected_record_id": term,
+                            }
+                        )
 
-        summary_lines = [
-            "# Review Report",
-            "",
-            f"- Mode: {args.mode}",
-            f"- Timestamp (UTC): {timestamp}",
-            f"- Findings: {len(findings)}",
-            "",
-            "## Findings",
-        ]
-        if not findings:
-            summary_lines.append("- No issues detected.")
-        else:
-            for item in findings:
-                summary_lines.append(
-                    f"- [{item['severity'].upper()}] {item['finding_type']} | {item['affected_artifact']} | {item['description']}"
-                )
+            # WRITE_REPORT
+            with tracer.start_span(
+                name="WRITE_REPORT",
+                metadata=build_metadata(
+                    run_id=run_id,
+                    agent_name=args.agent_name,
+                    policy_name=args.policy_name,
+                    state_name="WRITE_REPORT",
+                    corpus_id=args.corpus_id,
+                ),
+            ):
+                report_md = report_dir / f"review_report_{timestamp}.md"
+                report_jsonl = report_dir / f"review_findings_{timestamp}.jsonl"
 
-        report_md.write_text("\n".join(summary_lines) + "\n", encoding="utf-8")
-        with report_jsonl.open("w", encoding="utf-8") as fp:
-            for item in findings:
-                fp.write(json.dumps(item, ensure_ascii=True) + "\n")
+                summary_lines = [
+                    "# Review Report",
+                    "",
+                    f"- Mode: {args.mode}",
+                    f"- Timestamp (UTC): {timestamp}",
+                    f"- Findings: {len(findings)}",
+                    "",
+                    "## Findings",
+                ]
+                if not findings:
+                    summary_lines.append("- No issues detected.")
+                else:
+                    for item in findings:
+                        summary_lines.append(
+                            f"- [{item['severity'].upper()}] {item['finding_type']} | {item['affected_artifact']} | {item['description']}"
+                        )
 
+                report_md.write_text("\n".join(summary_lines) + "\n", encoding="utf-8")
+                with report_jsonl.open("w", encoding="utf-8") as fp:
+                    for item in findings:
+                        fp.write(json.dumps(item, ensure_ascii=True) + "\n")
+
+        tracer.flush()
         LOGGER.info("Review complete in review-only mode.")
-        LOGGER.info("Markdown report: %s", report_md)
-        LOGGER.info("JSONL findings: %s", report_jsonl)
+        if report_md:
+            LOGGER.info("Markdown report: %s", report_md)
+        if report_jsonl:
+            LOGGER.info("JSONL findings: %s", report_jsonl)
         return 0
 
     except Exception as exc:  # pylint: disable=broad-except
