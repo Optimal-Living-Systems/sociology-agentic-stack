@@ -20,6 +20,13 @@ import yaml
 
 from _common import configure_logging, ensure_dir, load_environment, require_file
 
+# Ensure repo root is on sys.path when executing scripts directly.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from integrations.langfuse.tracing import LangfuseTracer, build_metadata  # noqa: E402
+
 LOGGER = logging.getLogger("run_session")
 
 
@@ -74,6 +81,16 @@ def parse_args() -> argparse.Namespace:
         help="Optional externally-specified run identifier.",
     )
     parser.add_argument(
+        "--agent-name",
+        default="sherpa",
+        help="Logical agent name for observability metadata.",
+    )
+    parser.add_argument(
+        "--policy-name",
+        default="sociology_session",
+        help="Policy/workflow name used for observability metadata.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Validate inputs and print planned actions without writing artifacts.",
@@ -118,13 +135,53 @@ def main() -> int:
         LOGGER.info("taxonomy_seeds=%s", seed_nodes if seed_nodes else "<none>")
         LOGGER.info("model_config=%s corpus_id=%s", args.model_config, args.corpus_id)
 
+        tracer = LangfuseTracer()
+        trace_meta = build_metadata(
+            run_id=run_id,
+            agent_name=args.agent_name,
+            policy_name=args.policy_name,
+            state_name="INTAKE",
+            corpus_id=args.corpus_id,
+        )
+
+        summary = None
+        claims = None
+        glossary = None
+        critique = None
+        summary_metadata = None
+
         if args.dry_run:
-            LOGGER.info("Dry-run enabled. No artifacts were written.")
-            return 0
+            LOGGER.info("Dry-run enabled. No artifacts will be written.")
 
-        ensure_dir(artifacts_dir)
-
-        summary = f"""# Sociology Research Summary
+        with tracer.start_trace(
+            name=args.policy_name,
+            session_id=run_id,
+            metadata=trace_meta,
+        ):
+            for state in [
+                "INTAKE",
+                "RETRIEVE_LOCAL",
+                "RETRIEVE_WEB",
+                "SYNTHESIZE",
+                "CRITIQUE",
+                "FINALIZE",
+            ]:
+                state_meta = build_metadata(
+                    run_id=run_id,
+                    agent_name=args.agent_name,
+                    policy_name=args.policy_name,
+                    state_name=state,
+                    corpus_id=args.corpus_id,
+                )
+                with tracer.start_span(name=state, metadata=state_meta):
+                    if state == "INTAKE":
+                        LOGGER.info("INTAKE complete.")
+                    elif state == "RETRIEVE_LOCAL":
+                        LOGGER.info("RETRIEVE_LOCAL complete (placeholder).")
+                    elif state == "RETRIEVE_WEB":
+                        LOGGER.info("RETRIEVE_WEB complete (placeholder).")
+                    elif state == "SYNTHESIZE":
+                        summary = f"""# Sociology Research Summary
 
 ## Query
 {args.query}
@@ -144,74 +201,85 @@ def main() -> int:
 - Which interventions most effectively rebuild trust in local institutions?
 - How do intrinsic motivation and collective identity interact in youth organizing?
 """
-        claims = [
-            {
-                "id": "CLM-001",
-                "claim_text": "Lower institutional trust is associated with increased civic disengagement among urban youth.",
-                "confidence": 0.78,
-                "evidence_refs": ["S001", "S002"],
-                "taxonomy_nodes": ["civic_disengagement", "institutional_trust", "urban_inequality"],
-                "counterarguments": [
-                    "Some communities maintain participation via informal civic networks."
-                ],
-            },
-            {
-                "id": "CLM-002",
-                "claim_text": "Housing precarity reduces continuity in collective participation.",
-                "confidence": 0.74,
-                "evidence_refs": ["S004"],
-                "taxonomy_nodes": ["housing_precarity", "social_movements", "social_capital"],
-                "counterarguments": [
-                    "Short-term mobilization can still occur despite housing instability."
-                ],
-            },
-        ]
-        glossary = [
-            {
-                "term": "Institutional Trust",
-                "definition": "Perceived legitimacy and reliability of public institutions.",
-                "domain": "political_sociology",
-                "related_terms": ["Political Participation", "Civic Disengagement"],
-                "source_refs": ["S001", "S003"],
-            },
-            {
-                "term": "Environmental Justice",
-                "definition": "Fair distribution of environmental harms, benefits, and decision-making power.",
-                "domain": "environmental_sociology",
-                "related_terms": ["Urban Inequality", "Climate Vulnerability"],
-                "source_refs": ["S005"],
-            },
-        ]
-        critique = """# Critique Report (Session-Level)
+                        claims = [
+                            {
+                                "id": "CLM-001",
+                                "claim_text": "Lower institutional trust is associated with increased civic disengagement among urban youth.",
+                                "confidence": 0.78,
+                                "evidence_refs": ["S001", "S002"],
+                                "taxonomy_nodes": ["civic_disengagement", "institutional_trust", "urban_inequality"],
+                                "counterarguments": [
+                                    "Some communities maintain participation via informal civic networks."
+                                ],
+                            },
+                            {
+                                "id": "CLM-002",
+                                "claim_text": "Housing precarity reduces continuity in collective participation.",
+                                "confidence": 0.74,
+                                "evidence_refs": ["S004"],
+                                "taxonomy_nodes": ["housing_precarity", "social_movements", "social_capital"],
+                                "counterarguments": [
+                                    "Short-term mobilization can still occur despite housing instability."
+                                ],
+                            },
+                        ]
+                        glossary = [
+                            {
+                                "term": "Institutional Trust",
+                                "definition": "Perceived legitimacy and reliability of public institutions.",
+                                "domain": "political_sociology",
+                                "related_terms": ["Political Participation", "Civic Disengagement"],
+                                "source_refs": ["S001", "S003"],
+                            },
+                            {
+                                "term": "Environmental Justice",
+                                "definition": "Fair distribution of environmental harms, benefits, and decision-making power.",
+                                "domain": "environmental_sociology",
+                                "related_terms": ["Urban Inequality", "Climate Vulnerability"],
+                                "source_refs": ["S005"],
+                            },
+                        ]
+                        critique = """# Critique Report (Session-Level)
 
 - No high-severity schema issues detected in generated placeholder artifacts.
 - Citation coverage appears sufficient for all generated claims.
 - Full audit should be performed with `scripts/run_review.py`.
 """
-        summary_metadata = {
-            "run_id": run_id,
-            "query": args.query,
-            "taxonomy_seeds": seed_nodes,
-            "sources_cited": 5,
-            "schema_pack_version": args.schema_pack_version,
-            "model_used": args.model_config,
-            "timestamp": timestamp,
-        }
+                        summary_metadata = {
+                            "run_id": run_id,
+                            "query": args.query,
+                            "taxonomy_seeds": seed_nodes,
+                            "sources_cited": 5,
+                            "schema_pack_version": args.schema_pack_version,
+                            "model_used": args.model_config,
+                            "timestamp": timestamp,
+                        }
+                    elif state == "CRITIQUE":
+                        LOGGER.info("CRITIQUE complete (placeholder).")
+                    elif state == "FINALIZE":
+                        if args.dry_run:
+                            LOGGER.info("Dry-run: skipping artifact writes.")
+                            continue
+                        if summary is None or claims is None or glossary is None or critique is None:
+                            raise RuntimeError("SYNTHESIZE did not produce artifacts.")
+                        ensure_dir(artifacts_dir)
+                        (artifacts_dir / "summary.md").write_text(summary)
+                        with (artifacts_dir / "claims.jsonl").open("w", encoding="utf-8") as fp:
+                            for rec in claims:
+                                fp.write(json.dumps(rec, ensure_ascii=True) + "\n")
+                        with (artifacts_dir / "glossary.jsonl").open("w", encoding="utf-8") as fp:
+                            for rec in glossary:
+                                fp.write(json.dumps(rec, ensure_ascii=True) + "\n")
+                        (artifacts_dir / "critique.md").write_text(critique)
+                        (artifacts_dir / "summary.metadata.json").write_text(
+                            json.dumps(summary_metadata, indent=2)
+                        )
+                        LOGGER.info("Artifacts written to %s", artifacts_dir)
+                        LOGGER.info(
+                            "Generated files: summary.md, claims.jsonl, glossary.jsonl, critique.md"
+                        )
 
-        (artifacts_dir / "summary.md").write_text(summary)
-        with (artifacts_dir / "claims.jsonl").open("w", encoding="utf-8") as fp:
-            for rec in claims:
-                fp.write(json.dumps(rec, ensure_ascii=True) + "\n")
-        with (artifacts_dir / "glossary.jsonl").open("w", encoding="utf-8") as fp:
-            for rec in glossary:
-                fp.write(json.dumps(rec, ensure_ascii=True) + "\n")
-        (artifacts_dir / "critique.md").write_text(critique)
-        (artifacts_dir / "summary.metadata.json").write_text(
-            json.dumps(summary_metadata, indent=2)
-        )
-
-        LOGGER.info("Artifacts written to %s", artifacts_dir)
-        LOGGER.info("Generated files: summary.md, claims.jsonl, glossary.jsonl, critique.md")
+        tracer.flush()
         return 0
 
     except Exception as exc:  # pylint: disable=broad-except
